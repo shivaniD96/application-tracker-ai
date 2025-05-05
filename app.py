@@ -10,6 +10,12 @@ from jinja2 import Template
 import requests
 from bs4 import BeautifulSoup
 from werkzeug.utils import secure_filename
+import json
+from concurrent.futures import ThreadPoolExecutor
+import random
+import time
+from functools import wraps
+from urllib.parse import urljoin, quote_plus
 
 # CONFIGURATION
 DB_PATH = 'jobs.db'
@@ -17,6 +23,395 @@ UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
 PER_PAGE = 5
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Scraping Configuration
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15'
+]
+
+# Add this near the top of the file, after the imports
+COMMON_LOCATIONS = [
+    # United States
+    'United States', 'New York', 'San Francisco', 'Los Angeles', 'Chicago', 'Boston', 'Seattle', 'Austin', 'Remote',
+    # India
+    'India', 'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Pune', 'Chennai', 'Gurgaon', 'Noida',
+    # UAE
+    'UAE', 'Dubai', 'Abu Dhabi', 'Sharjah', 'Ras Al Khaimah',
+    # Europe
+    'United Kingdom', 'London', 'Germany', 'Berlin', 'France', 'Paris', 'Netherlands', 'Amsterdam',
+    # Asia
+    'Singapore', 'Hong Kong', 'Tokyo', 'Seoul', 'Shanghai', 'Beijing',
+    # Canada
+    'Canada', 'Toronto', 'Vancouver', 'Montreal',
+    # Australia
+    'Australia', 'Sydney', 'Melbourne'
+]
+
+def get_random_user_agent():
+    return random.choice(USER_AGENTS)
+
+def rate_limit(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        time.sleep(random.uniform(2, 5))  # Random delay between 2-5 seconds
+        return func(*args, **kwargs)
+    return wrapper
+
+def get_location_options():
+    return sorted(COMMON_LOCATIONS)
+
+@rate_limit
+def fetch_linkedin_jobs(keyword, location):
+    try:
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        }
+        
+        # Handle country-level searches
+        if location in ['India', 'UAE', 'United States', 'United Kingdom', 'Germany', 'France', 'Netherlands', 'Singapore', 'Canada', 'Australia']:
+            search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location={quote_plus(location)}"
+        else:
+            search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location={quote_plus(location)}"
+        
+        response = requests.get(search_url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        jobs = []
+        
+        for job_card in soup.select('.jobs-search__results-list li'):
+            try:
+                title_elem = job_card.select_one('.base-search-card__title')
+                company_elem = job_card.select_one('.base-search-card__subtitle')
+                location_elem = job_card.select_one('.job-search-card__location')
+                link_elem = job_card.select_one('a.base-card__full-link')
+                
+                if not all([title_elem, company_elem, location_elem, link_elem]):
+                    continue
+                
+                job_location = location_elem.text.strip()
+                # Standardize location format
+                if 'India' in job_location:
+                    job_location = 'India'
+                elif 'UAE' in job_location or 'Dubai' in job_location:
+                    job_location = 'UAE'
+                
+                job = {
+                    'title': title_elem.text.strip(),
+                    'company': company_elem.text.strip(),
+                    'company_info': '',
+                    'location': job_location,
+                    'url': link_elem['href'],
+                    'date_posted': datetime.now().strftime('%Y-%m-%d'),
+                    'platform': 'LinkedIn',
+                    'description': '',
+                    'requirements': [],
+                    'match_score': 'N/A',
+                    'salary_min': '',
+                    'salary_max': '',
+                    'salary_currency': '',
+                    'benefits': []
+                }
+                
+                # Fetch job details
+                job_details = fetch_linkedin_job_details(job['url'])
+                job.update(job_details)
+                
+                jobs.append(job)
+            except Exception as e:
+                print(f"Error parsing LinkedIn job card: {str(e)}")
+                continue
+                
+        return jobs
+    except Exception as e:
+        print(f"Error fetching LinkedIn jobs: {str(e)}")
+        return []
+
+@rate_limit
+def fetch_indeed_jobs(keyword, location):
+    try:
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        }
+        
+        search_url = f"https://www.indeed.com/jobs?q={quote_plus(keyword)}&l={quote_plus(location)}"
+        response = requests.get(search_url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        jobs = []
+        
+        for job_card in soup.select('.job_seen_beacon'):
+            try:
+                title_elem = job_card.select_one('.jobTitle')
+                company_elem = job_card.select_one('.companyName')
+                location_elem = job_card.select_one('.companyLocation')
+                link_elem = job_card.select_one('a.jcs-JobTitle')
+                
+                if not all([title_elem, company_elem, location_elem, link_elem]):
+                    continue
+                
+                job = {
+                    'title': title_elem.text.strip(),
+                    'company': company_elem.text.strip(),
+                    'company_info': '',
+                    'location': location_elem.text.strip(),
+                    'url': urljoin('https://www.indeed.com', link_elem['href']),
+                    'date_posted': datetime.now().strftime('%Y-%m-%d'),
+                    'platform': 'Indeed',
+                    'description': '',
+                    'requirements': [],
+                    'match_score': 'N/A',
+                    'salary_min': '',
+                    'salary_max': '',
+                    'salary_currency': '',
+                    'benefits': []
+                }
+                
+                # Fetch job details
+                job_details = fetch_indeed_job_details(job['url'])
+                job.update(job_details)
+                
+                jobs.append(job)
+            except Exception as e:
+                print(f"Error parsing Indeed job card: {str(e)}")
+                continue
+                
+        return jobs
+    except Exception as e:
+        print(f"Error fetching Indeed jobs: {str(e)}")
+        return []
+
+@rate_limit
+def fetch_ziprecruiter_jobs(keyword, location):
+    try:
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        }
+        
+        search_url = f"https://www.ziprecruiter.com/jobs-search?search={quote_plus(keyword)}&location={quote_plus(location)}"
+        response = requests.get(search_url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        jobs = []
+        
+        for job_card in soup.select('.job_content'):
+            try:
+                title_elem = job_card.select_one('.job_title')
+                company_elem = job_card.select_one('.company_name')
+                location_elem = job_card.select_one('.location')
+                link_elem = job_card.select_one('a.job_link')
+                
+                if not all([title_elem, company_elem, location_elem, link_elem]):
+                    continue
+                
+                job = {
+                    'title': title_elem.text.strip(),
+                    'company': company_elem.text.strip(),
+                    'company_info': '',
+                    'location': location_elem.text.strip(),
+                    'url': link_elem['href'],
+                    'date_posted': datetime.now().strftime('%Y-%m-%d'),
+                    'platform': 'ZipRecruiter',
+                    'description': '',
+                    'requirements': [],
+                    'match_score': 'N/A',
+                    'salary_min': '',
+                    'salary_max': '',
+                    'salary_currency': '',
+                    'benefits': []
+                }
+                
+                # Fetch job details
+                job_details = fetch_ziprecruiter_job_details(job['url'])
+                job.update(job_details)
+                
+                jobs.append(job)
+            except Exception as e:
+                print(f"Error parsing ZipRecruiter job card: {str(e)}")
+                continue
+                
+        return jobs
+    except Exception as e:
+        print(f"Error fetching ZipRecruiter jobs: {str(e)}")
+        return []
+
+def fetch_linkedin_job_details(url):
+    try:
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        }
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        description = soup.select_one('.description__text')
+        requirements = soup.select('.description__job-criteria-item')
+        
+        # Extract requirements from job criteria
+        req_list = []
+        for req in requirements:
+            req_text = req.text.strip()
+            if req_text:
+                req_list.append(req_text)
+        
+        return {
+            'description': description.text.strip() if description else '',
+            'requirements': req_list,
+            'benefits': [],
+            'salary_range': ''
+        }
+    except Exception as e:
+        print(f"Error fetching LinkedIn job details: {str(e)}")
+        return {
+            'description': '',
+            'requirements': [],
+            'benefits': [],
+            'salary_range': ''
+        }
+
+def fetch_indeed_job_details(url):
+    try:
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        }
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        description = soup.select_one('#jobDescriptionText')
+        requirements = soup.select('.jobsearch-ReqAndQualSection-item')
+        
+        # Extract requirements from job description
+        req_list = []
+        if description:
+            # Look for bullet points or numbered lists
+            bullets = description.select('ul li, ol li')
+            for bullet in bullets:
+                req_text = bullet.text.strip()
+                if req_text:
+                    req_list.append(req_text)
+        
+        return {
+            'description': description.text.strip() if description else '',
+            'requirements': req_list,
+            'benefits': [],
+            'salary_range': ''
+        }
+    except Exception as e:
+        print(f"Error fetching Indeed job details: {str(e)}")
+        return {
+            'description': '',
+            'requirements': [],
+            'benefits': [],
+            'salary_range': ''
+        }
+
+def fetch_ziprecruiter_job_details(url):
+    try:
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        }
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        description = soup.select_one('.job_description')
+        requirements = soup.select('.job_requirements li')
+        
+        # Extract requirements from job requirements section
+        req_list = []
+        for req in requirements:
+            req_text = req.text.strip()
+            if req_text:
+                req_list.append(req_text)
+        
+        return {
+            'description': description.text.strip() if description else '',
+            'requirements': req_list,
+            'benefits': [],
+            'salary_range': ''
+        }
+    except Exception as e:
+        print(f"Error fetching ZipRecruiter job details: {str(e)}")
+        return {
+            'description': '',
+            'requirements': [],
+            'benefits': [],
+            'salary_range': ''
+        }
+
+def fetch_all_jobs(keyword, location):
+    jobs = []
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [
+            executor.submit(fetch_linkedin_jobs, keyword, location),
+            executor.submit(fetch_indeed_jobs, keyword, location),
+            executor.submit(fetch_ziprecruiter_jobs, keyword, location)
+        ]
+        
+        for future in futures:
+            try:
+                jobs.extend(future.result())
+            except Exception as e:
+                print(f"Error in job fetch: {str(e)}")
+    
+    # Remove duplicates based on URL
+    seen_urls = set()
+    unique_jobs = []
+    for job in jobs:
+        if job['url'] not in seen_urls:
+            seen_urls.add(job['url'])
+            unique_jobs.append(job)
+    
+    return unique_jobs
+
+def fetch_job_details(url):
+    try:
+        # Determine which platform the URL belongs to
+        if 'linkedin.com' in url:
+            return fetch_linkedin_job_details(url)
+        elif 'indeed.com' in url:
+            return fetch_indeed_job_details(url)
+        elif 'ziprecruiter.com' in url:
+            return fetch_ziprecruiter_job_details(url)
+        else:
+            return {
+                'description': '',
+                'requirements': [],
+                'benefits': [],
+                'salary_range': ''
+            }
+    except Exception as e:
+        print(f"Error fetching job details: {str(e)}")
+        return {
+            'description': '',
+            'requirements': [],
+            'benefits': [],
+            'salary_range': ''
+        }
 
 # APP INIT
 print(f"=== Loading UPDATED app.py at {time.asctime()} ===")
@@ -34,9 +429,9 @@ def init_db():
     c.execute("""
 CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY,
-    title TEXT, company TEXT, location TEXT, url TEXT UNIQUE,
-    date_posted TEXT, platform TEXT, requirements TEXT,
-    fetched_at TIMESTAMP
+    title TEXT, company TEXT, company_info TEXT, location TEXT, url TEXT UNIQUE,
+    date_posted TEXT, platform TEXT, requirements TEXT, description TEXT,
+    match_score TEXT, fetched_at TIMESTAMP
 )
 """)
     c.execute("""
@@ -59,30 +454,27 @@ init_db()
 def allowed_file(fn):
     return '.' in fn and fn.rsplit('.',1)[1].lower() in ALLOWED_EXTENSIONS
 
-# STUB FUNCTIONS
-def fetch_linkedin_jobs(keyword, location):
-    # Dummy data stub: return sample jobs based on keyword and location
-    if not keyword:
-        return []
-    jobs = []
-    for i in range(1, 6):
-        jobs.append({
-            'title': f"{keyword} Position {i}",
-            'company': f"Company {i}",
-            'location': location or f"Location {i}",
-            'url': f"https://example.com/job/{i}"
-        })
-    return jobs
-def fetch_job_details(url):
-    return {'requirements': ['Req1','Req2'], 'date_posted': datetime.now().strftime('%Y-%m-%d'), 'platform': 'LinkedIn'}
-
 # SAVE LISTINGS
 def save_listings(listings):
     conn = get_conn(); c = conn.cursor()
     for job in listings:
+        # Ensure requirements is a list
+        if isinstance(job['requirements'], str):
+            requirements = job['requirements'].split(',')
+        elif isinstance(job['requirements'], list):
+            requirements = job['requirements']
+        else:
+            requirements = []
+            
         c.execute(
-            "INSERT OR IGNORE INTO jobs (title,company,location,url,date_posted,platform,requirements,fetched_at) VALUES (?,?,?,?,?,?,?,?)",
-            (job['title'],job['company'],job['location'],job['url'],job['date_posted'],job['platform'],','.join(job['requirements']),datetime.now())
+            """INSERT OR IGNORE INTO jobs 
+            (title, company, company_info, location, url, date_posted, platform, 
+            requirements, description, match_score, fetched_at) 
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (job['title'], job['company'], job.get('company_info', ''),
+             job['location'], job['url'], job['date_posted'], job['platform'],
+             json.dumps(requirements), job.get('description', ''),
+             job.get('match_score', 'N/A'), datetime.now())
         )
     conn.commit(); conn.close()
 
@@ -118,35 +510,272 @@ FOOTER = """
 # TEMPLATES
 SEARCH_HTML = NAVBAR + '''
 <div class="container">
-  <h2>Job Search</h2>
-  <form method="post" class="row g-3 mb-3">
-    <div class="col-md-5"><input name="keyword" placeholder="Role" value="{{keyword}}" class="form-control"/></div>
-    <div class="col-md-5"><input name="location" placeholder="Location" value="{{location}}" class="form-control"/></div>
-    <div class="col-md-2"><button class="btn btn-primary w-100">Search</button></div>
-  </form>
-  <form method="get" class="row g-3 mb-3">
-    <div class="col-md-4"><input name="filter_loc" placeholder="Filter location" value="{{filter_loc}}" class="form-control"/></div>
+  <h2 class="mb-4">Job Search</h2>
+  <form method="post" class="row g-3 mb-4">
     <div class="col-md-4">
-      <select name="page" class="form-select">
-      {% for p in range(1,pages+1) %}
-        <option value="{{p}}" {% if p==page %}selected{% endif %}>Page {{p}}</option>
-      {% endfor %}
+      <input name="keyword" placeholder="Role (e.g., Software Engineer, Product Manager)" value="{{keyword}}" class="form-control"/>
+    </div>
+    <div class="col-md-3">
+      <select name="location" class="form-select">
+        <option value="">All Locations</option>
+        {% for loc in locations %}
+          <option value="{{loc}}" {% if loc==location %}selected{% endif %}>{{loc}}</option>
+        {% endfor %}
       </select>
     </div>
-    <div class="col-md-4"><button class="btn btn-secondary w-100">Apply Filters</button></div>
-  </form>
-  {% for job in rows %}
-    <div class="card mb-3">
-      <div class="card-body">
-        <h5>{{job['title']}} <small class="text-muted">({{job['platform']}})</small></h5>
-        <h6 class="card-subtitle mb-2 text-muted">{{job['company']}} - {{job['location']}}</h6>
-        <p><small>Posted: {{job['date_posted']}}</small></p>
-        <p>{{job['requirements']}}</p>
-        <a href="/apply_external/{{job['id']}}" class="btn btn-success">Apply</a>
-      </div>
+    <div class="col-md-3">
+      <select name="platform" class="form-select">
+        <option value="">All Platforms</option>
+        {% for plat in platforms %}
+          <option value="{{plat}}" {% if plat==platform %}selected{% endif %}>{{plat}}</option>
+        {% endfor %}
+      </select>
     </div>
-  {% endfor %}
+    <div class="col-md-2">
+      <button class="btn btn-primary w-100">Search</button>
+    </div>
+  </form>
+
+  <form method="get" class="row g-3 mb-4">
+    <div class="col-md-3">
+      <select name="filter_loc" class="form-select">
+        <option value="">Filter by Location</option>
+        {% for loc in locations %}
+          <option value="{{loc}}" {% if loc==filter_loc %}selected{% endif %}>{{loc}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="filter_platform" class="form-select">
+        <option value="">Filter by Platform</option>
+        {% for plat in platforms %}
+          <option value="{{plat}}" {% if plat==filter_platform %}selected{% endif %}>{{plat}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="page" class="form-select">
+        {% for p in range(1,pages+1) %}
+          <option value="{{p}}" {% if p==page %}selected{% endif %}>Page {{p}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-secondary w-100">Apply Filters</button>
+    </div>
+  </form>
+
+  <div class="row row-cols-1 row-cols-md-2 g-4">
+    {% for job in rows %}
+      <div class="col">
+        <div class="card h-100">
+          <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0">{{job['title']}}</h5>
+              <span class="badge bg-info">{{job['platform']}}</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <h6 class="card-subtitle text-muted">{{job['company']}}</h6>
+              <p class="text-muted mb-1">
+                <i class="bi bi-geo-alt"></i> {{job['location']}}
+              </p>
+              <p class="text-muted small">
+                <i class="bi bi-calendar"></i> Posted: {{job['date_posted']}}
+              </p>
+            </div>
+
+            <div class="mb-3">
+              <h6 class="card-subtitle">Description</h6>
+              <div class="job-description">
+                {% if job['description'] %}
+                  <div class="description-content">
+                    {{job['description'] | replace('\n', '<br>') | safe}}
+                  </div>
+                {% else %}
+                  <p class="text-muted">No description available</p>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if job['requirements'] %}
+              <div class="mb-3">
+                <h6 class="card-subtitle">Requirements</h6>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for req in job['requirements'] %}
+                    <span class="badge bg-primary">{{req}}</span>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+
+            {% if job.get('salary_min') or job.get('salary_max') %}
+              <div class="mb-3">
+                <h6 class="card-subtitle">Salary Range</h6>
+                <p class="mb-0">
+                  {% if job['salary_min'] and job['salary_max'] %}
+                    {{job['salary_min']}} - {{job['salary_max']}} {{job['salary_currency']}}
+                  {% elif job['salary_min'] %}
+                    From {{job['salary_min']}} {{job['salary_currency']}}
+                  {% elif job['salary_max'] %}
+                    Up to {{job['salary_max']}} {{job['salary_currency']}}
+                  {% endif %}
+                </p>
+              </div>
+            {% endif %}
+
+            {% if job.get('benefits') %}
+              <div class="mb-3">
+                <h6 class="card-subtitle">Benefits</h6>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for benefit in job['benefits'] %}
+                    <span class="badge bg-success">{{benefit}}</span>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+          <div class="card-footer bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+              {% if job['description'] or job['requirements'] %}
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#jobDetails{{job['id']}}">
+                  <i class="bi bi-info-circle"></i> Details
+                </button>
+              {% else %}
+                <button type="button" class="btn btn-outline-primary" disabled>
+                  <i class="bi bi-info-circle"></i> No Details Available
+                </button>
+              {% endif %}
+              <a href="{{job['url']}}" target="_blank" class="btn btn-success">
+                <i class="bi bi-box-arrow-up-right"></i> Apply
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Job Details Modal -->
+      {% if job['description'] or job['requirements'] %}
+        <div class="modal fade" id="jobDetails{{job['id']}}" tabindex="-1" aria-labelledby="jobDetailsLabel{{job['id']}}" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="jobDetailsLabel{{job['id']}}">{{job['title']}} at {{job['company']}}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-4">
+                  <h6>Company Information</h6>
+                  <p class="mb-1"><strong>Location:</strong> {{job['location']}}</p>
+                  <p class="mb-1"><strong>Posted:</strong> {{job['date_posted']}}</p>
+                  <p class="mb-1"><strong>Platform:</strong> {{job['platform']}}</p>
+                </div>
+
+                {% if job['description'] %}
+                  <div class="mb-4">
+                    <h6>Job Description</h6>
+                    <div class="job-description">
+                      <div class="description-content">
+                        {{job['description'] | replace('\n', '<br>') | safe}}
+                      </div>
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if job['requirements'] %}
+                  <div class="mb-4">
+                    <h6>Requirements</h6>
+                    <ul class="list-group">
+                      {% for req in job['requirements'] %}
+                        <li class="list-group-item">{{req}}</li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+
+                {% if job.get('salary_min') or job.get('salary_max') %}
+                  <div class="mb-4">
+                    <h6>Salary Information</h6>
+                    <p class="mb-0">
+                      {% if job['salary_min'] and job['salary_max'] %}
+                        {{job['salary_min']}} - {{job['salary_max']}} {{job['salary_currency']}}
+                      {% elif job['salary_min'] %}
+                        From {{job['salary_min']}} {{job['salary_currency']}}
+                      {% elif job['salary_max'] %}
+                        Up to {{job['salary_max']}} {{job['salary_currency']}}
+                      {% endif %}
+                    </p>
+                  </div>
+                {% endif %}
+
+                {% if job.get('benefits') %}
+                  <div class="mb-4">
+                    <h6>Benefits</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for benefit in job['benefits'] %}
+                        <span class="badge bg-success">{{benefit}}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="{{job['url']}}" target="_blank" class="btn btn-success">Apply Now</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
 </div>
+
+<style>
+  .job-description {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+  }
+  
+  .description-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  
+  .card {
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  }
+  
+  .badge {
+    font-size: 0.9em;
+    padding: 0.5em 0.8em;
+  }
+  
+  .list-group-item {
+    border-left: none;
+    border-right: none;
+  }
+  
+  .list-group-item:first-child {
+    border-top: none;
+  }
+  
+  .list-group-item:last-child {
+    border-bottom: none;
+  }
+</style>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 ''' + FOOTER
 
 TRACKER_HTML = NAVBAR + '''
@@ -200,18 +829,56 @@ def home(): return redirect(url_for('search'))
 def search():
     keyword = request.form.get('keyword','') if request.method=='POST' else ''
     location = request.form.get('location','') if request.method=='POST' else ''
+    platform = request.form.get('platform','') if request.method=='POST' else ''
+    
     if request.method=='POST':
-        lst = fetch_linkedin_jobs(keyword, location)
+        lst = fetch_all_jobs(keyword, location)
         save_listings(lst)
-    conn = get_conn(); rows = conn.execute('SELECT * FROM jobs ORDER BY fetched_at DESC').fetchall(); conn.close()
+    
+    conn = get_conn()
+    rows = conn.execute('SELECT * FROM jobs ORDER BY fetched_at DESC').fetchall()
+    conn.close()
+    
+    # Get unique locations and platforms for dropdowns
+    locations = sorted(set(get_location_options() + [row['location'] for row in rows]))
+    platforms = sorted(set(row['platform'] for row in rows))
+    
+    # Apply filters
     filter_loc = request.args.get('filter_loc','')
+    filter_platform = request.args.get('filter_platform','')
     page = request.args.get('page',1,type=int)
-    if filter_loc: rows = [r for r in rows if filter_loc.lower() in r['location'].lower()]
-    total=len(rows); pages=(total+PER_PAGE-1)//PER_PAGE
-    page = max(1, min(page,pages))
+    
+    if filter_loc:
+        rows = [r for r in rows if filter_loc.lower() in r['location'].lower()]
+    if filter_platform:
+        rows = [r for r in rows if filter_platform.lower() == r['platform'].lower()]
+    
+    total = len(rows)
+    pages = (total + PER_PAGE - 1) // PER_PAGE
+    page = max(1, min(page, pages))
     rows = rows[(page-1)*PER_PAGE : page*PER_PAGE]
+    
+    # Convert requirements from JSON string to list
     rows = [dict(r) for r in rows]
-    return render_template_string(SEARCH_HTML,keyword=keyword,location=location,filter_loc=filter_loc,page=page,pages=pages,rows=rows)
+    for row in rows:
+        try:
+            row['requirements'] = json.loads(row['requirements'])
+        except:
+            row['requirements'] = []
+    
+    return render_template_string(
+        SEARCH_HTML,
+        keyword=keyword,
+        location=location,
+        platform=platform,
+        filter_loc=filter_loc,
+        filter_platform=filter_platform,
+        page=page,
+        pages=pages,
+        rows=rows,
+        locations=locations,
+        platforms=platforms
+    )
 
 @app.route('/tracker', methods=['GET','POST'])
 def tracker():
@@ -242,6 +909,11 @@ def download(filename): return send_from_directory(app.config['UPLOAD_FOLDER'],f
 
 @app.route('/_ping')
 def ping(): return 'pong'
+
+@app.route('/init-db')
+def init_db_route():
+    init_db()
+    return 'Database initialized successfully!'
 
 # RUNNING
 # python3 -m flask --app app.py --debug run
