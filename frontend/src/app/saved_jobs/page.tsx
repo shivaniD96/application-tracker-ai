@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import JobDetailsModal from '../components/JobDetailsModal';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
+import Pagination from '@mui/material/Pagination';
 
 interface SavedJob {
   id: number;
@@ -25,17 +26,21 @@ export default function SavedJobsPage() {
   const [modalJob, setModalJob] = useState<any | null>(null);
   const [actionLoading, setActionLoading] = useState<{[id: number]: string}>({});
   const [appliedJobs, setAppliedJobs] = useState<{[id: number]: boolean}>({});
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     async function fetchJobs() {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/saved_jobs`);
+      const params = new URLSearchParams({ page: String(page) });
+      const res = await fetch(`${API_BASE_URL}/api/saved_jobs?${params.toString()}`);
       const data = await res.json();
       setJobs(data.saved_jobs || []);
+      setTotalPages(data.pages || 1);
       setLoading(false);
     }
     fetchJobs();
-  }, []);
+  }, [page]);
 
   const handleDetails = (job: SavedJob) => {
     if (modalOpen && modalJob && modalJob.id === job.id) {
@@ -65,6 +70,10 @@ export default function SavedJobsPage() {
       setAppliedJobs(j => ({ ...j, [jobId]: true }));
     }
     setActionLoading(a => ({ ...a, [jobId]: '' }));
+  };
+
+  const handlePageChange = (_: any, value: number) => {
+    setPage(value);
   };
 
   return (
@@ -115,6 +124,9 @@ export default function SavedJobsPage() {
               )}
             </div>
           </div>
+          <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
+            <Pagination count={totalPages} page={page} onChange={handlePageChange} color="primary" />
+          </Stack>
         </div>
       </div>
       <JobDetailsModal open={modalOpen} onClose={() => { setModalOpen(false); setModalJob(null); }} job={modalJob} />

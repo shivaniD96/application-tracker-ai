@@ -992,15 +992,28 @@ def tracker():
 @app.route('/api/saved_jobs', methods=['GET'])
 def saved_jobs():
     conn = get_conn()
-    saved_jobs = conn.execute('''
-        SELECT j.*, sj.saved_at 
-        FROM jobs j 
-        JOIN saved_jobs sj ON j.id = sj.job_id 
-        ORDER BY sj.saved_at DESC
-    ''').fetchall()
-    conn.close()
-    saved_jobs = [dict(job) for job in saved_jobs]
-    return jsonify({'saved_jobs': saved_jobs})
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = PER_PAGE
+        all_jobs = conn.execute('''
+            SELECT j.*, sj.saved_at 
+            FROM jobs j 
+            JOIN saved_jobs sj ON j.id = sj.job_id 
+            ORDER BY sj.saved_at DESC
+        ''').fetchall()
+        total = len(all_jobs)
+        pages = (total + per_page - 1) // per_page
+        page = max(1, min(page, pages)) if pages > 0 else 1
+        jobs = all_jobs[(page-1)*per_page : page*per_page]
+        jobs = [dict(job) for job in jobs]
+        return jsonify({
+            'saved_jobs': jobs,
+            'total': total,
+            'pages': pages,
+            'current_page': page
+        })
+    finally:
+        conn.close()
 
 @app.route('/api/details', methods=['GET', 'POST'])
 def details():

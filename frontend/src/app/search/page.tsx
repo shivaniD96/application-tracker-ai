@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import JobDetailsModal from '../components/JobDetailsModal';
+import Pagination from '@mui/material/Pagination';
+import Stack from '@mui/material/Stack';
 
 interface Job {
   id: number;
@@ -26,17 +28,25 @@ export default function SearchPage() {
   const [actionMsg, setActionMsg] = useState<{[id: number]: string}>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [modalJob, setModalJob] = useState<any | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async (e?: React.FormEvent, pageOverride?: number) => {
+    if (e) e.preventDefault();
     setLoading(true);
     setDetailsJobId(null);
     setDetails(null);
-    const params = new URLSearchParams({ keyword, location, platform });
+    const params = new URLSearchParams({ keyword, location, platform, page: String(pageOverride || page) });
     const res = await fetch(`/api/jobs?${params.toString()}`);
     const data = await res.json();
     setJobs(data.jobs || []);
+    setTotalPages(data.pages || 1);
     setLoading(false);
+  };
+
+  const handlePageChange = (_: any, value: number) => {
+    setPage(value);
+    handleSearch(undefined, value);
   };
 
   const handleDetails = async (jobId: number) => {
@@ -160,6 +170,9 @@ export default function SearchPage() {
               </div>
             ))}
           </div>
+          <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
+            <Pagination count={totalPages} page={page} onChange={handlePageChange} color="primary" />
+          </Stack>
         </div>
       </div>
       <JobDetailsModal open={modalOpen} onClose={() => { setModalOpen(false); setModalJob(null); }} job={modalJob} />
