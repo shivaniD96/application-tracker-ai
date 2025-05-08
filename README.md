@@ -30,6 +30,11 @@ make install
 make run
 ```
 
+### 4. To **deactivate** the virtual environment, simply run:
+```bash
+deactivate
+```
+
 - The backend will start on [http://localhost:5000](http://localhost:5000)
 - The first run will initialize the SQLite database (`jobs.db`).
 
