@@ -1,5 +1,6 @@
 import './globals.css';
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -136,7 +137,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             font-weight: 500;
           }
         `}</style>
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <Script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" strategy="afterInteractive" />
       </body>
     </html>
   );

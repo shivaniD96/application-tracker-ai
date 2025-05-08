@@ -6,6 +6,12 @@ import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Pagination from '@mui/material/Pagination';
 
+interface Suggestion {
+  category: string;
+  suggestion: string;
+  action_items: string[];
+}
+
 interface SavedJob {
   id: number;
   title: string;
@@ -15,6 +21,8 @@ interface SavedJob {
   description: string;
   platform: string;
   saved_at: string;
+  requirements?: string[];
+  suggestions?: Suggestion[];
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
@@ -23,7 +31,7 @@ export default function SavedJobsPage() {
   const [jobs, setJobs] = useState<SavedJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalJob, setModalJob] = useState<any | null>(null);
+  const [modalJob, setModalJob] = useState<SavedJob | null>(null);
   const [actionLoading, setActionLoading] = useState<{[id: number]: string}>({});
   const [appliedJobs, setAppliedJobs] = useState<{[id: number]: boolean}>({});
   const [page, setPage] = useState(1);
@@ -72,7 +80,7 @@ export default function SavedJobsPage() {
     setActionLoading(a => ({ ...a, [jobId]: '' }));
   };
 
-  const handlePageChange = (_: any, value: number) => {
+  const handlePageChange = (_: unknown, value: number) => {
     setPage(value);
   };
 
@@ -105,7 +113,7 @@ export default function SavedJobsPage() {
                             </div>
                           </div>
                           <Stack direction="row" spacing={1}>
-                            <Button size="small" variant="outlined" onClick={() => handleDetails(job)}>
+                            <Button size="small" variant="outlined" onClick={() => handleDetails(job as SavedJob)}>
                               Details
                             </Button>
                             <Button size="small" variant="outlined" color="error" onClick={() => handleUnsave(job.id)} disabled={actionLoading[job.id] === 'unsave'}>
@@ -129,7 +137,11 @@ export default function SavedJobsPage() {
           </Stack>
         </div>
       </div>
-      <JobDetailsModal open={modalOpen} onClose={() => { setModalOpen(false); setModalJob(null); }} job={modalJob} />
+      <JobDetailsModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setModalJob(null); }}
+        job={modalJob ? { ...modalJob, requirements: modalJob.requirements ?? [], suggestions: modalJob.suggestions ?? [] } : null}
+      />
     </div>
   );
 }

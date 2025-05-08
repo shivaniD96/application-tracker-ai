@@ -5,6 +5,12 @@ import JobDetailsModal from '../components/JobDetailsModal';
 import Pagination from '@mui/material/Pagination';
 import Stack from '@mui/material/Stack';
 
+interface Suggestion {
+  category: string;
+  suggestion: string;
+  action_items: string[];
+}
+
 interface Job {
   id: number;
   title: string;
@@ -14,6 +20,8 @@ interface Job {
   description: string;
   platform: string;
   application_status?: string;
+  requirements?: string[];
+  suggestions?: Suggestion[];
 }
 
 export default function SearchPage() {
@@ -22,20 +30,16 @@ export default function SearchPage() {
   const [platform, setPlatform] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
-  const [detailsJobId, setDetailsJobId] = useState<number | null>(null);
-  const [details, setDetails] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<{[id: number]: string}>({});
   const [actionMsg, setActionMsg] = useState<{[id: number]: string}>({});
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalJob, setModalJob] = useState<any | null>(null);
+  const [modalJob, setModalJob] = useState<Job | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const handleSearch = async (e?: React.FormEvent, pageOverride?: number) => {
     if (e) e.preventDefault();
     setLoading(true);
-    setDetailsJobId(null);
-    setDetails(null);
     const params = new URLSearchParams({ keyword, location, platform, page: String(pageOverride || page) });
     const res = await fetch(`/api/jobs?${params.toString()}`);
     const data = await res.json();
@@ -44,7 +48,7 @@ export default function SearchPage() {
     setLoading(false);
   };
 
-  const handlePageChange = (_: any, value: number) => {
+  const handlePageChange = (_: unknown, value: number) => {
     setPage(value);
     handleSearch(undefined, value);
   };
@@ -156,7 +160,7 @@ export default function SearchPage() {
                       </button>
                       {job.application_status === 'Applied' ? (
                         <button className="btn btn-sm btn-outline-danger" disabled>
-                          Didn't Apply
+                          Didn&apos;t Apply
                         </button>
                       ) : (
                         <button className="btn btn-sm btn-outline-primary" disabled={actionLoading[job.id] === 'apply'} onClick={() => handleApply(job.id)}>
@@ -176,7 +180,11 @@ export default function SearchPage() {
           </Stack>
         </div>
       </div>
-      <JobDetailsModal open={modalOpen} onClose={() => { setModalOpen(false); setModalJob(null); }} job={modalJob} />
+      <JobDetailsModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setModalJob(null); }}
+        job={modalJob ? { ...modalJob, requirements: modalJob.requirements ?? [], suggestions: modalJob.suggestions ?? [] } : null}
+      />
     </div>
   );
 }

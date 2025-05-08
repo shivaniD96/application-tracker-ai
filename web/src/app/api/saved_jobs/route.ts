@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export async function GET() {
   const flaskUrl = 'http://127.0.0.1:5000/api/saved_jobs';

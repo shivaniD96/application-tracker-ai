@@ -12,10 +12,29 @@ import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 
+interface Suggestion {
+  category: string;
+  suggestion: string;
+  action_items: string[];
+}
+
+interface Job {
+  id?: number;
+  title: string;
+  company: string;
+  location: string;
+  platform: string;
+  description: string;
+  requirements: string[];
+  suggestions: Suggestion[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
 interface JobDetailsModalProps {
   open: boolean;
   onClose: () => void;
-  job: any | null;
+  job: Job | null;
 }
 
 export default function JobDetailsModal({ open, onClose, job }: JobDetailsModalProps) {
@@ -40,7 +59,7 @@ export default function JobDetailsModal({ open, onClose, job }: JobDetailsModalP
                 <Divider sx={{ my: 2 }} />
                 <Typography variant="subtitle2" gutterBottom>Requirements:</Typography>
                 <List dense>
-                  {job.requirements.map((req: string, idx: number) => (
+                  {job.requirements.map((req, idx) => (
                     <ListItem key={idx} disablePadding>
                       <ListItemText primary={req} />
                     </ListItem>
@@ -48,18 +67,24 @@ export default function JobDetailsModal({ open, onClose, job }: JobDetailsModalP
                 </List>
               </>
             )}
-            {Array.isArray(job.suggestions) && job.suggestions.length > 0 && (
-              <>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2" gutterBottom>Suggestions:</Typography>
-                <List dense>
-                  {job.suggestions.map((s: any, idx: number) => (
-                    <ListItem key={idx} disablePadding>
-                      <ListItemText primary={s.suggestion} />
-                    </ListItem>
+            {job && job.suggestions && job.suggestions.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <Typography variant="subtitle1" gutterBottom>Suggestions</Typography>
+                <ul>
+                  {job.suggestions.map((s: Suggestion, idx: number) => (
+                    <li key={idx}>
+                      <strong>{s.category}:</strong> {s.suggestion}
+                      {s.action_items && s.action_items.length > 0 && (
+                        <ul>
+                          {s.action_items.map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
                   ))}
-                </List>
-              </>
+                </ul>
+              </div>
             )}
           </DialogContent>
           <DialogActions>
