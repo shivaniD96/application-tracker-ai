@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import JobDetailsModal from '../components/JobDetailsModal';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
 
 interface SavedJob {
   id: number;
@@ -21,6 +23,8 @@ export default function SavedJobsPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalJob, setModalJob] = useState<any | null>(null);
+  const [actionLoading, setActionLoading] = useState<{[id: number]: string}>({});
+  const [appliedJobs, setAppliedJobs] = useState<{[id: number]: boolean}>({});
 
   useEffect(() => {
     async function fetchJobs() {
@@ -41,6 +45,26 @@ export default function SavedJobsPage() {
     }
     setModalJob(job);
     setModalOpen(true);
+  };
+
+  const handleUnsave = async (jobId: number) => {
+    setActionLoading(a => ({ ...a, [jobId]: 'unsave' }));
+    const res = await fetch(`/api/save_job/${jobId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.status === 'success') {
+      setJobs(jobs => jobs.filter(j => j.id !== jobId));
+    }
+    setActionLoading(a => ({ ...a, [jobId]: '' }));
+  };
+
+  const handleApply = async (jobId: number) => {
+    setActionLoading(a => ({ ...a, [jobId]: 'apply' }));
+    const res = await fetch(`/api/apply_job/${jobId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'success' || data.status === 'already_applied') {
+      setAppliedJobs(j => ({ ...j, [jobId]: true }));
+    }
+    setActionLoading(a => ({ ...a, [jobId]: '' }));
   };
 
   return (
@@ -71,11 +95,17 @@ export default function SavedJobsPage() {
                               <small><i className="bi bi-globe"></i> {job.platform}</small>
                             </div>
                           </div>
-                          <div className="d-flex gap-2">
-                            <button className="btn btn-sm btn-outline-primary" onClick={() => handleDetails(job)}>Details</button>
-                            <button className="btn btn-sm btn-outline-danger">Unsave</button>
-                            <button className="btn btn-sm btn-outline-primary">Apply</button>
-                          </div>
+                          <Stack direction="row" spacing={1}>
+                            <Button size="small" variant="outlined" onClick={() => handleDetails(job)}>
+                              Details
+                            </Button>
+                            <Button size="small" variant="outlined" color="error" onClick={() => handleUnsave(job.id)} disabled={actionLoading[job.id] === 'unsave'}>
+                              {actionLoading[job.id] === 'unsave' ? 'Unsaving...' : 'Unsave'}
+                            </Button>
+                            <Button size="small" variant="outlined" color="primary" onClick={() => handleApply(job.id)} disabled={actionLoading[job.id] === 'apply' || appliedJobs[job.id]}>
+                              {appliedJobs[job.id] ? 'Applied' : actionLoading[job.id] === 'apply' ? 'Applying...' : 'Apply'}
+                            </Button>
+                          </Stack>
                         </div>
                         {/* No description here, only in modal */}
                       </div>

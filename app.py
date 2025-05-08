@@ -1307,17 +1307,26 @@ def update_application_status(job_id):
 def api_search():
     return search()
 
-@app.route('/api/save_job/<int:job_id>', methods=['POST'])
+@app.route('/api/save_job/<int:job_id>', methods=['POST', 'DELETE'])
 def save_job(job_id):
     conn = get_conn()
     try:
-        # Check if already saved
-        exists = conn.execute('SELECT 1 FROM saved_jobs WHERE job_id = ?', (job_id,)).fetchone()
-        if exists:
-            return jsonify({'status': 'already_saved'})
-        conn.execute('INSERT INTO saved_jobs (job_id, saved_at) VALUES (?, ?)', (job_id, datetime.now()))
-        conn.commit()
-        return jsonify({'status': 'success'})
+        if request.method == 'POST':
+            # Check if already saved
+            exists = conn.execute('SELECT 1 FROM saved_jobs WHERE job_id = ?', (job_id,)).fetchone()
+            if exists:
+                return jsonify({'status': 'already_saved'})
+            conn.execute('INSERT INTO saved_jobs (job_id, saved_at) VALUES (?, ?)', (job_id, datetime.now()))
+            conn.commit()
+            return jsonify({'status': 'success'})
+        elif request.method == 'DELETE':
+            # Unsave job
+            exists = conn.execute('SELECT 1 FROM saved_jobs WHERE job_id = ?', (job_id,)).fetchone()
+            if not exists:
+                return jsonify({'status': 'not_saved'})
+            conn.execute('DELETE FROM saved_jobs WHERE job_id = ?', (job_id,))
+            conn.commit()
+            return jsonify({'status': 'success'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
