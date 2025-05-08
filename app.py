@@ -143,7 +143,7 @@ def fetch_linkedin_jobs(keyword, location):
             except Exception as e:
                 print(f"Error parsing LinkedIn job card: {str(e)}")
                 continue
-                
+        
         return jobs
     except Exception as e:
         print(f"Error fetching LinkedIn jobs: {str(e)}")
@@ -906,13 +906,13 @@ NAVBAR = """
           <span>Resume Details</span>
         </a>
       </li>
-    </ul>
+      </ul>
     <div class="sidebar-footer p-3">
       <div class="d-flex align-items-center">
         <i class="bi bi-gear me-2"></i>
         <span>Settings</span>
-      </div>
     </div>
+  </div>
   </div>
 
   <!-- Main Content -->
@@ -1045,29 +1045,29 @@ SEARCH_HTML = NAVBAR + '''
                 <input name="keyword" placeholder="Role (e.g., Software Engineer, Product Manager)" 
                        value="{{keyword}}" class="form-control form-control-lg"/>
               </div>
-            </div>
-            <div class="col-md-3">
+    </div>
+    <div class="col-md-3">
               <select name="location" class="form-select form-select-lg">
-                <option value="">All Locations</option>
-                {% for loc in locations %}
-                  <option value="{{loc}}" {% if loc==location %}selected{% endif %}>{{loc}}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-3">
+        <option value="">All Locations</option>
+        {% for loc in locations %}
+          <option value="{{loc}}" {% if loc==location %}selected{% endif %}>{{loc}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
               <select name="platform" class="form-select form-select-lg">
-                <option value="">All Platforms</option>
-                {% for plat in platforms %}
-                  <option value="{{plat}}" {% if plat==platform %}selected{% endif %}>{{plat}}</option>
-                {% endfor %}
-              </select>
-            </div>
+        <option value="">All Platforms</option>
+        {% for plat in platforms %}
+          <option value="{{plat}}" {% if plat==platform %}selected{% endif %}>{{plat}}</option>
+        {% endfor %}
+      </select>
+    </div>
             <div class="col-md-1">
               <button class="btn btn-primary btn-lg w-100">
                 <i class="bi bi-search"></i>
               </button>
-            </div>
-          </form>
+    </div>
+  </form>
         </div>
       </div>
     </div>
@@ -1079,22 +1079,22 @@ SEARCH_HTML = NAVBAR + '''
         <div class="card-body">
           <form method="get" class="row g-3">
             <div class="col-md-4">
-              <select name="filter_loc" class="form-select">
-                <option value="">Filter by Location</option>
-                {% for loc in locations %}
-                  <option value="{{loc}}" {% if loc==filter_loc %}selected{% endif %}>{{loc}}</option>
-                {% endfor %}
-              </select>
-            </div>
+      <select name="filter_loc" class="form-select">
+        <option value="">Filter by Location</option>
+        {% for loc in locations %}
+          <option value="{{loc}}" {% if loc==filter_loc %}selected{% endif %}>{{loc}}</option>
+        {% endfor %}
+      </select>
+    </div>
             <div class="col-md-4">
-              <select name="filter_platform" class="form-select">
-                <option value="">Filter by Platform</option>
-                {% for plat in platforms %}
-                  <option value="{{plat}}" {% if plat==filter_platform %}selected{% endif %}>{{plat}}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-3">
+      <select name="filter_platform" class="form-select">
+        <option value="">Filter by Platform</option>
+        {% for plat in platforms %}
+          <option value="{{plat}}" {% if plat==filter_platform %}selected{% endif %}>{{plat}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
               <select name="sort_by" class="form-select">
                 <option value="recent" {% if sort_by=='recent' %}selected{% endif %}>Recently Posted</option>
                 <option value="oldest" {% if sort_by=='oldest' %}selected{% endif %}>Oldest First</option>
@@ -1102,9 +1102,9 @@ SEARCH_HTML = NAVBAR + '''
                 <option value="z_to_a" {% if sort_by=='z_to_a' %}selected{% endif %}>Title (Z to A)</option>
                 <option value="company_a_to_z" {% if sort_by=='company_a_to_z' %}selected{% endif %}>Company (A to Z)</option>
                 <option value="company_z_to_a" {% if sort_by=='company_z_to_a' %}selected{% endif %}>Company (Z to A)</option>
-              </select>
-            </div>
-            <div class="col-md-3">
+      </select>
+    </div>
+    <div class="col-md-3">
               <select name="application_status" class="form-select">
                 <option value="">All Applications</option>
                 <option value="applied" {% if application_status=='applied' %}selected{% endif %}>Applied</option>
@@ -1115,12 +1115,12 @@ SEARCH_HTML = NAVBAR + '''
               <button class="btn btn-primary btn-lg w-100">
                 <i class="bi bi-search"></i>
               </button>
-            </div>
-          </form>
-        </div>
-      </div>
     </div>
-  </div>
+  </form>
+            </div>
+          </div>
+              </div>
+            </div>
 
   <!-- Top Pagination -->
   <div class="row mb-4">
@@ -1136,7 +1136,7 @@ SEARCH_HTML = NAVBAR + '''
             <li class="page-item {% if p == page %}active{% endif %}">
               <a class="page-link" href="{{ url_for('search', page=p, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) }}">{{ p }}</a>
             </li>
-          {% endfor %}
+                  {% endfor %}
           <li class="page-item {% if page == pages %}disabled{% endif %}">
             <a class="page-link" href="{{ url_for('search', page=page+1, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) if page < pages else '#' }}" aria-label="Next">
               <span aria-hidden="true">&raquo;</span>
@@ -1144,8 +1144,8 @@ SEARCH_HTML = NAVBAR + '''
           </li>
         </ul>
       </nav>
-    </div>
-  </div>
+                </div>
+              </div>
 
   <div class="row">
     <div class="col-12">
@@ -1159,7 +1159,7 @@ SEARCH_HTML = NAVBAR + '''
                     {{ job['title'] }}
                     {% if job.get('application_status') == 'Applied' %}
                     <i class="bi bi-check-circle-fill text-success ms-2" title="Applied"></i>
-                    {% endif %}
+                  {% endif %}
                   </a>
                 </h5>
                 <div class="d-flex gap-2">
@@ -1172,13 +1172,13 @@ SEARCH_HTML = NAVBAR + '''
                   {% if job.get('application_status') == 'Applied' %}
                   <button class="btn btn-sm btn-outline-danger didnt-apply" data-job-id="{{ job['id'] }}" type="button">
                     <i class="bi bi-x-circle"></i> Didn't Apply
-                  </button>
-                  {% else %}
+                </button>
+              {% else %}
                   <button class="btn btn-sm btn-outline-primary apply-job" data-job-id="{{ job['id'] }}" type="button">
                     <i class="bi bi-send"></i> Apply
-                  </button>
-                  {% endif %}
-                </div>
+                </button>
+              {% endif %}
+            </div>
               </div>
               <h6 class="card-subtitle mb-2 text-muted">{{ job['company'] }}</h6>
               <p class="card-text description-content">{{ job['description'] }}</p>
@@ -1198,9 +1198,9 @@ SEARCH_HTML = NAVBAR + '''
                            aria-valuenow="0"
                            aria-valuemin="0"
                            aria-valuemax="100"></div>
-                    </div>
-                  </div>
-                </div>
+          </div>
+        </div>
+      </div>
 
                 <!-- Matched Skills -->
                 <div class="matched-skills mb-3">
@@ -1212,13 +1212,13 @@ SEARCH_HTML = NAVBAR + '''
                 <div class="suggestions">
                   <h6 class="mb-2">Improvement Suggestions</h6>
                   <div class="suggestions-container"></div>
-                </div>
-              </div>
-            </div>
+                      </div>
+                    </div>
+                  </div>
           </div>
-        {% endfor %}
-      </div>
-    </div>
+                      {% endfor %}
+                  </div>
+                  </div>
   </div>
 
   <!-- Bottom Pagination -->
@@ -1235,7 +1235,7 @@ SEARCH_HTML = NAVBAR + '''
             <li class="page-item {% if p == page %}active{% endif %}">
               <a class="page-link" href="{{ url_for('search', page=p, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) }}">{{ p }}</a>
             </li>
-          {% endfor %}
+                      {% endfor %}
           <li class="page-item {% if page == pages %}disabled{% endif %}">
             <a class="page-link" href="{{ url_for('search', page=page+1, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) if page < pages else '#' }}" aria-label="Next">
               <span aria-hidden="true">&raquo;</span>
@@ -1243,9 +1243,9 @@ SEARCH_HTML = NAVBAR + '''
           </li>
         </ul>
       </nav>
-    </div>
-  </div>
-</div>
+                    </div>
+                  </div>
+              </div>
 
 <!-- Loading Modal -->
 <div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
@@ -1254,10 +1254,10 @@ SEARCH_HTML = NAVBAR + '''
       <div class="modal-body text-center p-4">
         <div class="spinner-border text-primary mb-3" role="status">
           <span class="visually-hidden">Loading...</span>
-        </div>
+              </div>
         <h5 class="mb-0">Loading job details...</h5>
-      </div>
-    </div>
+            </div>
+          </div>
   </div>
 </div>
 
@@ -1416,8 +1416,98 @@ SEARCH_HTML = NAVBAR + '''
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+  
+  // View Details functionality
+  document.querySelectorAll('.view-details').forEach(button => {
+    button.addEventListener('click', async function() {
+      const jobId = this.dataset.jobId;
+      loadingModal.show();
+      
+      try {
+        const response = await fetch(`/job_details/${jobId}`);
+        const job = await response.json();
+        
+        const card = this.closest('.card');
+        const descriptionContent = card.querySelector('.description-content');
+        if (descriptionContent) {
+          descriptionContent.innerHTML = job.description.replace(new RegExp('\\n', 'g'), '<br>');
+        }
+        
+        const matchAnalysis = card.querySelector('.match-analysis');
+        if (matchAnalysis) {
+          matchAnalysis.style.display = 'block';
+          
+          const matchScore = matchAnalysis.querySelector('.match-percentage');
+          const progressBar = matchAnalysis.querySelector('.progress-bar');
+          if (matchScore && progressBar && job.match_percentage !== undefined) {
+            matchScore.textContent = `${job.match_percentage}%`;
+            progressBar.style.width = `${job.match_percentage}%`;
+            progressBar.setAttribute('aria-valuenow', job.match_percentage);
+            progressBar.className = `progress-bar ${job.match_percentage >= 70 ? 'bg-success' : job.match_percentage >= 40 ? 'bg-warning' : 'bg-danger'}`;
+          }
+          
+          const skillsContainer = matchAnalysis.querySelector('.skills-container');
+          if (skillsContainer && job.matched_skills) {
+            let skillsHtml = '';
+            for (const [category, skills] of Object.entries(job.matched_skills)) {
+              if (skills && skills.length > 0) {
+                skillsHtml += `
+                  <div class="mb-2">
+                    <small class="text-muted">${category}:</small>
+                    <div>
+                      ${skills.map(skill => `<span class="badge bg-success me-1 mb-1">${skill}</span>`).join('')}
+                    </div>
+                  </div>
+                `;
+              }
+            }
+            skillsContainer.innerHTML = skillsHtml || '<p class="text-muted">No matched skills found.</p>';
+          }
+          
+          const suggestionsContainer = matchAnalysis.querySelector('.suggestions-container');
+          if (suggestionsContainer && job.suggestions) {
+            if (job.suggestions.length > 0) {
+              let suggestionsHtml = '';
+              job.suggestions.forEach(suggestion => {
+                suggestionsHtml += `
+                  <div class="suggestion-card mb-3">
+                    <div class="suggestion-header">
+                      <i class="bi bi-lightbulb me-2"></i>
+                      <strong>${suggestion.category}</strong>
+                    </div>
+                    <div class="suggestion-body">
+                      <p class="mb-2">${suggestion.suggestion}</p>
+                      ${suggestion.action_items ? `
+                        <div class="action-items">
+                          <small class="text-muted d-block mb-1">Recommended Actions:</small>
+                          <ul class="mb-0">
+                            ${suggestion.action_items.map(item => `<li>${item}</li>`).join('')}
+                          </ul>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                `;
+              });
+              suggestionsContainer.innerHTML = suggestionsHtml;
+            } else {
+              suggestionsContainer.innerHTML = '<p class="text-muted">No suggestions available.</p>';
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching job details:', error);
+        alert('Error loading job details. Please try again.');
+      } finally {
+        loadingModal.hide();
+      }
+    });
+  });
+});
+</script>
 ''' + FOOTER
 
 TRACKER_HTML = NAVBAR + '''
@@ -1438,34 +1528,34 @@ TRACKER_HTML = NAVBAR + '''
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
-              {% for app in apps %}
-                <tr>
-                  <td>{{app['job_id']}}</td>
-                  <td>{{app['title']}}</td>
+    <tbody>
+    {% for app in apps %}
+      <tr>
+        <td>{{app['job_id']}}</td>
+        <td>{{app['title']}}</td>
                   <td>
                     <span class="badge {% if app['status'] == 'Applied' %}bg-primary{% elif app['status'] == 'Rejected' %}bg-danger{% else %}bg-warning{% endif %}">
                       {{app['status']}}
                     </span>
                   </td>
-                  <td>{{app['applied_at']}}</td>
-                  <td>
-                    <form method="post" action="/update_status/{{app['id']}}" class="d-flex gap-2">
-                      <select name="status" class="form-select form-select-sm">
-                        {% for s in ['Applied','Rejected','No response'] %}
-                          <option value="{{s}}" {% if s==app['status'] %}selected{% endif %}>{{s}}</option>
-                        {% endfor %}
-                      </select>
-                      <input type="date" name="applied_at" value="{{app['applied_at']}}" class="form-control form-control-sm"/>
+        <td>{{app['applied_at']}}</td>
+        <td>
+          <form method="post" action="/update_status/{{app['id']}}" class="d-flex gap-2">
+            <select name="status" class="form-select form-select-sm">
+              {% for s in ['Applied','Rejected','No response'] %}
+                <option value="{{s}}" {% if s==app['status'] %}selected{% endif %}>{{s}}</option>
+              {% endfor %}
+            </select>
+            <input type="date" name="applied_at" value="{{app['applied_at']}}" class="form-control form-control-sm"/>
                       <button class="btn btn-sm btn-primary">
                         <i class="bi bi-save"></i>
                       </button>
-                    </form>
-                  </td>
-                </tr>
-              {% endfor %}
-              </tbody>
-            </table>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
           </div>
         </div>
       </div>
@@ -1481,7 +1571,7 @@ DETAILS_HTML = NAVBAR + '''
       <h2 class="display-5 mb-4 text-primary">Resume Details</h2>
       <div class="card shadow-sm">
         <div class="card-body">
-          {% if resume %}
+  {% if resume %}
             <div class="alert alert-info d-flex justify-content-between align-items-center">
               <div>
                 <i class="bi bi-file-earmark-text me-2"></i>
@@ -1499,7 +1589,7 @@ DETAILS_HTML = NAVBAR + '''
               <i class="bi bi-exclamation-triangle me-2"></i>
               No resume uploaded yet. Please upload your resume to track your applications.
             </div>
-          {% endif %}
+  {% endif %}
 
           <form method="post" enctype="multipart/form-data" class="mt-4">
             <div class="row g-3">
@@ -1515,13 +1605,13 @@ DETAILS_HTML = NAVBAR + '''
                 </small>
               </div>
             </div>
-          </form>
+  </form>
 
           {% if error %}
             <div class="alert alert-danger mt-3">
               <i class="bi bi-exclamation-circle me-2"></i>
               {{ error }}
-            </div>
+</div>
           {% endif %}
         </div>
       </div>
@@ -1674,8 +1764,8 @@ def search():
                 
                 # Add experience suggestions based on job requirements
                 experience_patterns = [
-                    r'(\d+)[\+]?\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
-                    r'experience\s*(?:of)?\s*(\d+)[\+]?\s*(?:years?|yrs?)'
+                    r'(\d+)\+\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
+                    r'experience\s*(?:of)?\s*(\d+)\+\s*(?:years?|yrs?)'
                 ]
                 
                 for pattern in experience_patterns:
@@ -1760,8 +1850,8 @@ def search():
             rows=rows,
             locations=locations,
             platforms=platforms,
-            max=max,
-            min=min
+            max=max,  # Add max function to template context
+            min=min   # Add min function to template context
         )
     finally:
         conn.close()
@@ -1873,7 +1963,7 @@ def job_details(job_id):
     
     if not job:
         print("Job not found")
-        return "Job not found", 404
+        return jsonify({"error": "Job not found"}), 404
     
     job = dict(job)
     print(f"Found job: {job['title']}")
@@ -1899,6 +1989,7 @@ def job_details(job_id):
             conn.close()
         except Exception as e:
             print(f"Error fetching job details: {str(e)}")
+            return jsonify({"error": str(e)}), 500
     
     # Calculate job match if resume exists
     if resume:
@@ -1935,8 +2026,8 @@ def job_details(job_id):
         
         # 2. Experience Analysis
         experience_patterns = [
-            r'(\d+)[\+]?\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
-            r'experience\s*(?:of)?\s*(\d+)[\+]?\s*(?:years?|yrs?)'
+            r'(\d+)\+\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
+            r'experience\s*(?:of)?\s*(\d+)\+\s*(?:years?|yrs?)'
         ]
         
         for pattern in experience_patterns:
@@ -2037,13 +2128,11 @@ def job_details(job_id):
         job['suggestions'] = suggestions
         print(f"Total suggestions generated: {len(suggestions)}")
     else:
-        print("No resume found")
-        job['match_percentage'] = 0
+        job['match_percentage'] = None
         job['matched_skills'] = {}
         job['missing_skills'] = {}
         job['suggestions'] = []
     
-    print(f"Returning job details with {len(job.get('suggestions', []))} suggestions")
     return jsonify(job)
 
 # RUNNING
@@ -2069,17 +2158,62 @@ except OSError:
 
 # Common technical skills and keywords
 TECHNICAL_SKILLS = {
-    'Programming Languages': ['python', 'java', 'javascript', 'c++', 'ruby', 'php', 'swift', 'kotlin', 'go', 'rust'],
-    'Web Technologies': ['html', 'css', 'react', 'angular', 'vue', 'node.js', 'django', 'flask', 'spring', 'express'],
-    'Databases': ['sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'oracle', 'sqlite'],
-    'Cloud Platforms': ['aws', 'azure', 'gcp', 'heroku', 'digitalocean'],
-    'DevOps': ['docker', 'kubernetes', 'jenkins', 'git', 'ci/cd', 'terraform'],
-    'AI/ML': ['machine learning', 'deep learning', 'tensorflow', 'pytorch', 'scikit-learn', 'nlp', 'computer vision'],
-    'Data Science': ['pandas', 'numpy', 'matplotlib', 'seaborn', 'r', 'tableau', 'power bi'],
-    'Mobile Development': ['android', 'ios', 'react native', 'flutter', 'xamarin'],
-    'Security': ['cybersecurity', 'penetration testing', 'network security', 'cryptography'],
-    'Project Management': ['agile', 'scrum', 'kanban', 'jira', 'trello', 'project management'],
-    'Soft Skills': ['leadership', 'communication', 'teamwork', 'problem-solving', 'time management']
+    'Programming Languages': [
+        'python', 'java', 'javascript', 'typescript', 'c++', 'c#', 'ruby', 'php', 'swift', 'kotlin', 'go', 'rust',
+        'scala', 'perl', 'r', 'matlab', 'sql', 'bash', 'powershell', 'assembly', 'haskell', 'elixir'
+    ],
+    'Web Technologies': [
+        'html', 'css', 'sass', 'less', 'react', 'angular', 'vue', 'node.js', 'express', 'django', 'flask',
+        'spring', 'asp.net', 'laravel', 'ruby on rails', 'graphql', 'rest api', 'websocket', 'jquery',
+        'bootstrap', 'tailwind', 'material-ui', 'next.js', 'nuxt.js', 'gatsby'
+    ],
+    'Databases': [
+        'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'oracle', 'sqlite', 'cassandra', 'elasticsearch',
+        'dynamodb', 'neo4j', 'couchdb', 'mariadb', 'firebase', 'cosmos db', 'bigquery', 'snowflake'
+    ],
+    'Cloud Platforms': [
+        'aws', 'azure', 'gcp', 'heroku', 'digitalocean', 'linode', 'vultr', 'alibaba cloud', 'ibm cloud',
+        'oracle cloud', 'cloudflare', 'netlify', 'vercel'
+    ],
+    'DevOps & Tools': [
+        'docker', 'kubernetes', 'jenkins', 'git', 'ci/cd', 'terraform', 'ansible', 'puppet', 'chef',
+        'prometheus', 'grafana', 'elk stack', 'splunk', 'nagios', 'jira', 'confluence', 'bitbucket',
+        'github actions', 'gitlab ci', 'circleci', 'travis ci', 'teamcity'
+    ],
+    'AI/ML': [
+        'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'scikit-learn', 'keras', 'nlp',
+        'computer vision', 'opencv', 'nltk', 'spacy', 'bert', 'gpt', 'transformer', 'reinforcement learning',
+        'neural networks', 'cnn', 'rnn', 'lstm', 'gan', 'svm', 'random forest', 'xgboost', 'lightgbm'
+    ],
+    'Data Science': [
+        'pandas', 'numpy', 'matplotlib', 'seaborn', 'r', 'tableau', 'power bi', 'looker', 'qlik',
+        'apache spark', 'hadoop', 'hive', 'pig', 'kafka', 'airflow', 'dbt', 'databricks', 'jupyter',
+        'data visualization', 'statistical analysis', 'a/b testing', 'experiment design'
+    ],
+    'Mobile Development': [
+        'android', 'ios', 'react native', 'flutter', 'xamarin', 'swift', 'kotlin', 'objective-c',
+        'mobile ui/ux', 'mobile testing', 'app store', 'play store', 'mobile security'
+    ],
+    'Security': [
+        'cybersecurity', 'penetration testing', 'network security', 'cryptography', 'ssl/tls',
+        'authentication', 'authorization', 'oauth', 'jwt', 'saml', 'mfa', 'vulnerability assessment',
+        'security compliance', 'gdpr', 'hipaa', 'pci dss', 'iso 27001', 'nist', 'owasp'
+    ],
+    'Project Management': [
+        'agile', 'scrum', 'kanban', 'jira', 'trello', 'asana', 'monday.com', 'project management',
+        'product management', 'sprint planning', 'retrospectives', 'user stories', 'backlog grooming',
+        'risk management', 'stakeholder management'
+    ],
+    'Soft Skills': [
+        'leadership', 'communication', 'teamwork', 'problem-solving', 'time management', 'collaboration',
+        'adaptability', 'critical thinking', 'creativity', 'emotional intelligence', 'conflict resolution',
+        'mentoring', 'presentation skills', 'negotiation', 'decision making', 'strategic thinking'
+    ],
+    'Methodologies': [
+        'agile', 'scrum', 'kanban', 'waterfall', 'devops', 'ci/cd', 'tdd', 'bdd', 'pair programming',
+        'code review', 'technical documentation', 'api design', 'microservices', 'domain-driven design',
+        'test-driven development', 'behavior-driven development'
+    ]
 }
 
 def extract_text_from_file(file_path):
@@ -2137,31 +2271,81 @@ def calculate_job_match(job_description, resume_skills):
     for category, skills in TECHNICAL_SKILLS.items():
         category_skills = []
         for skill in skills:
-            if skill in job_desc:
+            # Check for exact matches and variations
+            if skill in job_desc or f"{skill}s" in job_desc or f"{skill}ing" in job_desc:
                 category_skills.append(skill)
         if category_skills:
             job_skills[category] = category_skills
     
-    # Calculate match score
-    total_required_skills = sum(len(skills) for skills in job_skills.values())
-    if total_required_skills == 0:
-        return 0, [], {}
+    # Calculate match score with weighted categories
+    category_weights = {
+        'Programming Languages': 1.5,
+        'Web Technologies': 1.3,
+        'Databases': 1.2,
+        'Cloud Platforms': 1.2,
+        'DevOps & Tools': 1.3,
+        'AI/ML': 1.4,
+        'Data Science': 1.3,
+        'Mobile Development': 1.2,
+        'Security': 1.2,
+        'Project Management': 1.1,
+        'Soft Skills': 1.0,
+        'Methodologies': 1.1
+    }
     
+    total_weighted_skills = 0
+    total_matched_weighted_skills = 0
     matched_skills = {}
     missing_skills = {}
     
     for category, skills in job_skills.items():
+        weight = category_weights.get(category, 1.0)
         resume_category_skills = resume_skills.get(category, [])
+        
+        # Calculate weighted matches
         matched = [skill for skill in skills if skill in resume_category_skills]
         missing = [skill for skill in skills if skill not in resume_category_skills]
+        
+        total_weighted_skills += len(skills) * weight
+        total_matched_weighted_skills += len(matched) * weight
         
         if matched:
             matched_skills[category] = matched
         if missing:
             missing_skills[category] = missing
     
-    total_matched = sum(len(skills) for skills in matched_skills.values())
-    match_percentage = (total_matched / total_required_skills) * 100
+    # Calculate final match percentage
+    if total_weighted_skills == 0:
+        return 0, {}, {}
+    
+    match_percentage = (total_matched_weighted_skills / total_weighted_skills) * 100
+    
+    # Add skill level analysis
+    skill_levels = {
+        'expert': ['expert', 'advanced', 'senior', 'lead', 'architect'],
+        'intermediate': ['intermediate', 'mid-level', 'experienced'],
+        'basic': ['basic', 'entry-level', 'junior', 'familiar']
+    }
+    
+    # Analyze required skill levels from job description
+    required_levels = {}
+    for level, keywords in skill_levels.items():
+        for keyword in keywords:
+            if keyword in job_desc:
+                required_levels[level] = True
+    
+    # Add level information to matched and missing skills
+    for category in matched_skills:
+        matched_skills[category] = {
+            'skills': matched_skills[category],
+            'level': 'expert' if 'expert' in required_levels else 'intermediate' if 'intermediate' in required_levels else 'basic'
+        }
+    
+    for category in missing_skills:
+        missing_skills[category] = {
+            'skills': missing_skills[category],
+            'level': 'expert' if 'expert' in required_levels else 'intermediate' if 'intermediate' in required_levels else 'basic'
+        }
     
     return match_percentage, matched_skills, missing_skills
 
@@ -2169,25 +2353,50 @@ def generate_improvement_suggestions(missing_skills, job_description):
     """Generate AI-powered suggestions for improvement."""
     suggestions = []
     
-    # Analyze missing skills
-    for category, skills in missing_skills.items():
+    # Analyze missing skills with context
+    for category, skill_info in missing_skills.items():
+        skills = skill_info['skills']
+        level = skill_info['level']
+        
         if skills:
-            suggestions.append({
-                'category': category,
-                'missing_skills': skills,
-                'suggestion': f"Consider adding experience with {', '.join(skills)} to improve your match for this role.",
-                'action_items': [
-                    f"Add {skill} to your skills section" for skill in skills
+            # Get context from job description
+            context = []
+            for skill in skills:
+                # Look for sentences containing the skill
+                sentences = re.findall(r'[^.]*' + re.escape(skill) + r'[^.]*\.', job_description.lower())
+                if sentences:
+                    context.extend(sentences)
+            
+            # Generate contextual suggestions
+            if context:
+                context_str = ' '.join(context)
+                action_items = [
+                    f"Add {skill} to your skills section with {level} level proficiency" for skill in skills
                 ]
-            })
+                action_items.extend([
+                    f"Highlight relevant projects or experience with {', '.join(skills)}",
+                    f"Consider taking advanced courses or certifications in {', '.join(skills)}"
+                ])
+                suggestions.append({
+                    'category': f'Missing {category} Skills',
+                    'suggestion': f"The job requires {level} level knowledge of {', '.join(skills)}. Based on the job description: {context_str}",
+                    'action_items': action_items
+                })
+            else:
+                # If no specific context found, provide general suggestions
+                suggestions.append({
+                    'category': f'Missing {category} Skills',
+                    'suggestion': f"The job requires {level} level knowledge of {', '.join(skills)}. These skills are important for this role.",
+                    'action_items': [
+                        f"Add {skill} to your skills section with {level} level proficiency" for skill in skills
+                    ]
+                })
     
-    # Analyze job description for additional requirements
-    doc = nlp(job_description)
-    
-    # Look for experience requirements
+    # Analyze experience requirements
     experience_patterns = [
-        r'(\d+)[\+]?\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
-        r'experience\s*(?:of)?\s*(\d+)[\+]?\s*(?:years?|yrs?)'
+        r'(\d+)\+\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
+        r'experience\s*(?:of)?\s*(\d+)\+\s*(?:years?|yrs?)',
+        r'(\d+)\s*(?:years?|yrs?)\s*(?:of)?\s*experience'
     ]
     
     for pattern in experience_patterns:
@@ -2195,72 +2404,72 @@ def generate_improvement_suggestions(missing_skills, job_description):
         for match in matches:
             years = match.group(1)
             suggestions.append({
-                'category': 'Experience',
-                'suggestion': f"The job requires {years}+ years of experience. Make sure your resume highlights relevant experience.",
+                'category': 'Experience Requirements',
+                'suggestion': f"The job requires {years}+ years of experience. Make sure your resume clearly demonstrates your relevant experience.",
                 'action_items': [
-                    "Quantify your experience with specific years",
-                    "Highlight relevant projects and achievements",
-                    "Emphasize transferable skills from other roles"
+                    "Quantify your experience with specific years and achievements",
+                    "Highlight relevant projects and their impact",
+                    "Include metrics and results from your past roles",
+                    "Emphasize transferable skills from other experiences"
                 ]
             })
     
-    # Look for education requirements
-    education_keywords = ['bachelor', 'master', 'phd', 'degree', 'diploma', 'certification']
-    for keyword in education_keywords:
-        if keyword in job_description.lower():
+    # Analyze education requirements
+    education_keywords = {
+        'bachelor': ['bachelor', 'bs', 'ba', 'b.s.', 'b.a.'],
+        'master': ['master', 'ms', 'ma', 'm.s.', 'm.a.'],
+        'phd': ['phd', 'doctorate', 'ph.d.'],
+        'certification': ['certification', 'certified', 'certificate']
+    }
+    
+    for degree, keywords in education_keywords.items():
+        if any(keyword in job_description.lower() for keyword in keywords):
             suggestions.append({
-                'category': 'Education',
-                'suggestion': f"The job mentions {keyword} requirements. Ensure your education qualifications are clearly stated.",
+                'category': 'Education Requirements',
+                'suggestion': f"The job requires a {degree} degree. Ensure your education qualifications are prominently displayed.",
                 'action_items': [
-                    "List your highest education degree first",
-                    "Include relevant certifications",
-                    "Highlight relevant coursework"
+                    f"List your {degree} degree first in the education section",
+                    "Include relevant coursework and projects",
+                    "Highlight academic achievements and honors",
+                    "Mention relevant certifications if applicable"
                 ]
             })
     
-    # Look for specific responsibilities
-    responsibility_keywords = ['responsible for', 'duties include', 'key responsibilities', 'role and responsibilities']
-    for keyword in responsibility_keywords:
-        if keyword in job_description.lower():
+    # Analyze soft skills requirements
+    soft_skills = {
+        'communication': ['communication', 'communicate', 'presentation', 'writing', 'speaking'],
+        'leadership': ['leadership', 'lead', 'manage', 'supervise', 'mentor'],
+        'teamwork': ['teamwork', 'collaboration', 'team player', 'cross-functional'],
+        'problem-solving': ['problem-solving', 'analytical', 'critical thinking', 'troubleshooting'],
+        'time management': ['time management', 'deadline', 'prioritization', 'organization']
+    }
+    
+    for skill, keywords in soft_skills.items():
+        if any(keyword in job_description.lower() for keyword in keywords):
             suggestions.append({
-                'category': 'Responsibilities',
-                'suggestion': "The job description lists specific responsibilities. Align your experience with these requirements.",
+                'category': 'Soft Skills',
+                'suggestion': f"The job emphasizes {skill} skills. Add specific examples of these skills in your experience.",
                 'action_items': [
-                    "Review your past roles for similar responsibilities",
-                    "Highlight relevant achievements in these areas",
-                    "Use similar keywords in your experience descriptions"
+                    f"Add concrete examples of {skill} in your work experience",
+                    "Include metrics or results that demonstrate {skill}",
+                    "Highlight relevant projects where {skill} was crucial",
+                    "Mention any training or certifications related to {skill}"
                 ]
             })
     
-    # Look for soft skills
-    soft_skills = ['communication', 'leadership', 'teamwork', 'problem-solving', 'time management', 'collaboration']
-    found_soft_skills = []
-    for skill in soft_skills:
-        if skill in job_description.lower():
-            found_soft_skills.append(skill)
-    
-    if found_soft_skills:
+    # Analyze industry-specific requirements
+    industry_keywords = ['industry', 'sector', 'domain', 'field', 'market']
+    if any(keyword in job_description.lower() for keyword in industry_keywords):
         suggestions.append({
-            'category': 'Soft Skills',
-            'suggestion': f"The job emphasizes these soft skills: {', '.join(found_soft_skills)}. Highlight your experience in these areas.",
+            'category': 'Industry Experience',
+            'suggestion': "The job requires specific industry experience. Highlight your relevant industry background.",
             'action_items': [
-                f"Add examples of {skill} in your experience" for skill in found_soft_skills
+                "List relevant industry experience prominently",
+                "Highlight industry-specific projects and achievements",
+                "Mention industry certifications and training",
+                "Include industry-specific tools and technologies you've used"
             ]
         })
-    
-    # Look for industry-specific requirements
-    industry_keywords = ['industry', 'sector', 'domain', 'field']
-    for keyword in industry_keywords:
-        if keyword in job_description.lower():
-            suggestions.append({
-                'category': 'Industry Experience',
-                'suggestion': "The job requires specific industry experience. Highlight your relevant industry background.",
-                'action_items': [
-                    "List relevant industry experience",
-                    "Highlight industry-specific projects",
-                    "Mention industry certifications if any"
-                ]
-            })
     
     return suggestions
 
@@ -2484,7 +2693,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const card = this.closest('.card');
         const descriptionContent = card.querySelector('.description-content');
         if (descriptionContent) {
-          descriptionContent.innerHTML = job.description.replace(/\\n/g, '<br>');
+          descriptionContent.innerHTML = job.description.replace(new RegExp('\\n', 'g'), '<br>');
         }
         
         const matchAnalysis = card.querySelector('.match-analysis');
