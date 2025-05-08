@@ -1681,22 +1681,24 @@ def generate_improvement_suggestions(missing_skills, job_description):
     return suggestions
 
 if __name__ == '__main__':
-    # Download required NLTK data
-    nltk.download('stopwords')
-    nltk.download('punkt')
-    nltk.download('averaged_perceptron_tagger')
-    nltk.download('wordnet')
-    
-    # Load spaCy model
-    try:
-        nlp = spacy.load('en_core_web_sm')
-    except OSError:
-        print("Downloading spaCy model...")
-        spacy.cli.download('en_core_web_sm')
-        nlp = spacy.load('en_core_web_sm')
-    
-    # Create uploads directory if it doesn't exist
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
-    # Run the app
-    app.run(host=app.config['HOST'], port=app.config['PORT'], debug=True)
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'init-db':
+        init_db()
+        print('Database initialized successfully!')
+    else:
+        # Download required NLTK data
+        nltk.download('stopwords')
+        nltk.download('punkt')
+        nltk.download('averaged_perceptron_tagger')
+        nltk.download('wordnet')
+        # Load spaCy model
+        try:
+            nlp = spacy.load('en_core_web_sm')
+        except OSError:
+            print("Downloading spaCy model...")
+            spacy.cli.download('en_core_web_sm')
+            nlp = spacy.load('en_core_web_sm')
+        # Create uploads directory if it doesn't exist
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        # Run the app
+        app.run(host=app.config['HOST'], port=app.config['PORT'], debug=True)

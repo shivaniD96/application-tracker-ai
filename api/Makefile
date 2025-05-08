@@ -25,17 +25,14 @@ setup: check-python
 	@echo "Virtual environment created. Activate it with 'source venv/bin/activate'"
 
 install: check-python
-	. $(VENV)/bin/activate && pip install --upgrade pip
-	. $(VENV)/bin/activate && pip install -r requirements.txt
-	. $(VENV)/bin/activate && python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
-	. $(VENV)/bin/activate && python -m spacy download en_core_web_sm
-	@echo "Dependencies installed successfully"
+	$(PYTHON) -m pip install --upgrade pip
+	$(PYTHON) -m pip install -r requirements.txt
 
 run:
-	. $(VENV)/bin/activate && python3 -m flask --app $(FLASK_APP) --debug run
+	$(PYTHON) -m flask --app $(FLASK_APP) --debug run
 
 init-db:
-	. $(VENV)/bin/activate && flask --app $(FLASK_APP) init-db
+	$(PYTHON) app.py init-db
 	@echo "Database initialized successfully"
 
 clean:
