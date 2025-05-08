@@ -32,7 +32,7 @@ install: check-python
 	@echo "Dependencies installed successfully"
 
 run:
-	. $(VENV)/bin/activate && flask --app $(FLASK_APP) --debug run
+	. $(VENV)/bin/activate && python3 -m flask --app $(FLASK_APP) --debug run
 
 init-db:
 	. $(VENV)/bin/activate && flask --app $(FLASK_APP) init-db
