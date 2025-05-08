@@ -55,11 +55,12 @@ export default function SearchPage() {
       setModalJob(null);
       return;
     }
+    setModalOpen(true);
+    setModalJob(null);
     setActionLoading(a => ({ ...a, [jobId]: 'details' }));
     const res = await fetch(`/api/job_details/${jobId}`);
     const data = await res.json();
     setModalJob(data);
-    setModalOpen(true);
     setActionLoading(a => ({ ...a, [jobId]: '' }));
   };
 
