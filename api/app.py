@@ -3,7 +3,7 @@
 
 import os
 import time
-from flask import Flask, render_template_string, request, redirect, url_for, send_from_directory, jsonify
+from flask import Flask, request, redirect, url_for, send_from_directory, jsonify
 import sqlite3
 from datetime import datetime
 from jinja2 import Template
@@ -26,6 +26,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import PyPDF2
 import docx
+from flask_cors import CORS
 
 # CONFIGURATION
 DB_PATH = 'jobs.db'
@@ -782,7 +783,11 @@ def fetch_job_details(url):
 # APP INIT
 print(f"=== Loading UPDATED app.py at {time.asctime()} ===")
 app = Flask(__name__)
+CORS(app)  # Allow all origins
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['HOST'] = '0.0.0.0'  # Use IP instead of localhost
+app.config['PORT'] = 5000
 
 # DB UTILITIES
 def get_conn():
@@ -862,798 +867,13 @@ def apply_external(job_id):
     conn.commit(); conn.close()
     return redirect(row['url'])
 
-# NAVBAR & FOOTER
-NAVBAR = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Application Tracker</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-</head>
-<body>
-<div class="d-flex">
-  <!-- Sidebar -->
-  <div class="sidebar bg-dark text-white">
-    <div class="sidebar-header p-3">
-      <h4 class="mb-0 text-white">JobApp</h4>
-      <p class="text-muted small mb-0">Track your job search</p>
-    </div>
-    <ul class="nav flex-column">
-      <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'search' %}active{% endif %}" href="/search">
-          <i class="bi bi-search"></i>
-          <span>Search Jobs</span>
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'tracker' %}active{% endif %}" href="/tracker">
-          <i class="bi bi-list-check"></i>
-          <span>Application Tracker</span>
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'saved_jobs' %}active{% endif %}" href="/saved_jobs">
-          <i class="bi bi-bookmark"></i>
-          <span>Saved Jobs</span>
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'details' %}active{% endif %}" href="/details">
-          <i class="bi bi-file-earmark-text"></i>
-          <span>Resume Details</span>
-        </a>
-      </li>
-      </ul>
-    <div class="sidebar-footer p-3">
-      <div class="d-flex align-items-center">
-        <i class="bi bi-gear me-2"></i>
-        <span>Settings</span>
-    </div>
-  </div>
-  </div>
-
-  <!-- Main Content -->
-  <div class="main-content">
-"""
-FOOTER = """
-  </div>
-</div>
-
-<style>
-  /* Sidebar Styles */
-  .sidebar {
-    width: 250px;
-    min-height: 100vh;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-    transition: all 0.3s;
-  }
-
-  .sidebar-header {
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-  }
-
-  .sidebar .nav-link {
-    color: rgba(255,255,255,0.8);
-    padding: 0.8rem 1rem;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s;
-  }
-
-  .sidebar .nav-link:hover {
-    color: #fff;
-    background: rgba(255,255,255,0.1);
-  }
-
-  .sidebar .nav-link.active {
-    color: #fff;
-    background: rgba(255,255,255,0.1);
-    border-left: 4px solid #0d6efd;
-  }
-
-  .sidebar .nav-link i {
-    margin-right: 10px;
-    font-size: 1.1rem;
-  }
-
-  .sidebar-footer {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    border-top: 1px solid rgba(255,255,255,0.1);
-  }
-
-  /* Main Content Styles */
-  .main-content {
-    margin-left: 250px;
-    padding: 20px;
-    min-height: 100vh;
-    background-color: #f8f9fa;
-  }
-
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .sidebar {
-      width: 70px;
-    }
-    
-    .sidebar .nav-link span {
-      display: none;
-    }
-    
-    .sidebar-header h4, .sidebar-header p {
-      display: none;
-    }
-    
-    .main-content {
-      margin-left: 70px;
-    }
-    
-    .sidebar-footer span {
-      display: none;
-    }
-  }
-
-  /* Additional Styles */
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  }
-
-  .card {
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  }
-
-  .btn {
-    font-weight: 500;
-  }
-
-  .form-control, .form-select {
-    border-radius: 8px;
-  }
-
-  .badge {
-    font-weight: 500;
-  }
-</style>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-"""
-
-# TEMPLATES
-SEARCH_HTML = NAVBAR + '''
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col-12">
-      <h2 class="display-5 mb-4 text-primary">Job Search</h2>
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <form method="post" class="row g-3">
-            <div class="col-md-5">
-              <div class="input-group">
-                <span class="input-group-text bg-primary text-white">
-                  <i class="bi bi-search"></i>
-                </span>
-                <input name="keyword" placeholder="Role (e.g., Software Engineer, Product Manager)" 
-                       value="{{keyword}}" class="form-control form-control-lg"/>
-              </div>
-    </div>
-    <div class="col-md-3">
-              <select name="location" class="form-select form-select-lg">
-        <option value="">All Locations</option>
-        {% for loc in locations %}
-          <option value="{{loc}}" {% if loc==location %}selected{% endif %}>{{loc}}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-3">
-              <select name="platform" class="form-select form-select-lg">
-        <option value="">All Platforms</option>
-        {% for plat in platforms %}
-          <option value="{{plat}}" {% if plat==platform %}selected{% endif %}>{{plat}}</option>
-        {% endfor %}
-      </select>
-    </div>
-            <div class="col-md-1">
-              <button class="btn btn-primary btn-lg w-100">
-                <i class="bi bi-search"></i>
-              </button>
-    </div>
-  </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <form method="get" class="row g-3">
-            <div class="col-md-4">
-      <select name="filter_loc" class="form-select">
-        <option value="">Filter by Location</option>
-        {% for loc in locations %}
-          <option value="{{loc}}" {% if loc==filter_loc %}selected{% endif %}>{{loc}}</option>
-        {% endfor %}
-      </select>
-    </div>
-            <div class="col-md-4">
-      <select name="filter_platform" class="form-select">
-        <option value="">Filter by Platform</option>
-        {% for plat in platforms %}
-          <option value="{{plat}}" {% if plat==filter_platform %}selected{% endif %}>{{plat}}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-3">
-              <select name="sort_by" class="form-select">
-                <option value="recent" {% if sort_by=='recent' %}selected{% endif %}>Recently Posted</option>
-                <option value="oldest" {% if sort_by=='oldest' %}selected{% endif %}>Oldest First</option>
-                <option value="a_to_z" {% if sort_by=='a_to_z' %}selected{% endif %}>Title (A to Z)</option>
-                <option value="z_to_a" {% if sort_by=='z_to_a' %}selected{% endif %}>Title (Z to A)</option>
-                <option value="company_a_to_z" {% if sort_by=='company_a_to_z' %}selected{% endif %}>Company (A to Z)</option>
-                <option value="company_z_to_a" {% if sort_by=='company_z_to_a' %}selected{% endif %}>Company (Z to A)</option>
-      </select>
-    </div>
-    <div class="col-md-3">
-              <select name="application_status" class="form-select">
-                <option value="">All Applications</option>
-                <option value="applied" {% if application_status=='applied' %}selected{% endif %}>Applied</option>
-                <option value="not_applied" {% if application_status=='not_applied' %}selected{% endif %}>Not Applied</option>
-              </select>
-            </div>
-            <div class="col-md-1">
-              <button class="btn btn-primary btn-lg w-100">
-                <i class="bi bi-search"></i>
-              </button>
-    </div>
-  </form>
-            </div>
-          </div>
-              </div>
-            </div>
-
-  <!-- Top Pagination -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <nav aria-label="Page navigation">
-        <ul class="pagination justify-content-center">
-          <li class="page-item {% if page == 1 %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('search', page=page-1, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) if page > 1 else '#' }}" aria-label="Previous">
-              <span aria-hidden="true">&laquo;</span>
-            </a>
-          </li>
-          {% for p in range(max(1, page-2), min(pages+1, page+3)) %}
-            <li class="page-item {% if p == page %}active{% endif %}">
-              <a class="page-link" href="{{ url_for('search', page=p, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) }}">{{ p }}</a>
-            </li>
-                  {% endfor %}
-          <li class="page-item {% if page == pages %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('search', page=page+1, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) if page < pages else '#' }}" aria-label="Next">
-              <span aria-hidden="true">&raquo;</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-                </div>
-              </div>
-
-  <div class="row">
-    <div class="col-12">
-      <div class="job-list">
-        {% for job in rows %}
-          <div class="card mb-3">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-2">
-                <h5 class="card-title mb-0">
-                  <a href="{{ job['url'] }}" target="_blank" class="text-decoration-none">
-                    {{ job['title'] }}
-                    {% if job.get('application_status') == 'Applied' %}
-                    <i class="bi bi-check-circle-fill text-success ms-2" title="Applied"></i>
-                  {% endif %}
-                  </a>
-                </h5>
-                <div class="d-flex gap-2">
-                  <button class="btn btn-sm btn-outline-primary view-details" data-job-id="{{ job['id'] }}">
-                    <i class="bi bi-eye"></i> Details
-                  </button>
-                  <button class="btn btn-sm btn-outline-success save-job" data-job-id="{{ job['id'] }}" type="button">
-                    <i class="bi bi-bookmark"></i> Save
-                  </button>
-                  {% if job.get('application_status') == 'Applied' %}
-                  <button class="btn btn-sm btn-outline-danger didnt-apply" data-job-id="{{ job['id'] }}" type="button">
-                    <i class="bi bi-x-circle"></i> Didn't Apply
-                </button>
-              {% else %}
-                  <button class="btn btn-sm btn-outline-primary apply-job" data-job-id="{{ job['id'] }}" type="button">
-                    <i class="bi bi-send"></i> Apply
-                </button>
-              {% endif %}
-            </div>
-              </div>
-              <h6 class="card-subtitle mb-2 text-muted">{{ job['company'] }}</h6>
-              <p class="card-text description-content">{{ job['description'] }}</p>
-              
-              <!-- AI Job Match Analysis Section - Initially Hidden -->
-              <div class="match-analysis mt-4" style="display: none;">
-                <h6 class="mb-3">AI Job Match Analysis</h6>
-                
-                <!-- Match Score -->
-                <div class="match-score mb-3">
-                  <div class="d-flex align-items-center">
-                    <div class="match-percentage me-2">0%</div>
-                    <div class="progress flex-grow-1" style="height: 8px;">
-                      <div class="progress-bar"
-                           role="progressbar"
-                           style="width: 0%"
-                           aria-valuenow="0"
-                           aria-valuemin="0"
-                           aria-valuemax="100"></div>
-          </div>
-        </div>
-      </div>
-
-                <!-- Matched Skills -->
-                <div class="matched-skills mb-3">
-                  <h6 class="mb-2">Matched Skills</h6>
-                  <div class="skills-container"></div>
-                </div>
-
-                <!-- Suggestions -->
-                <div class="suggestions">
-                  <h6 class="mb-2">Improvement Suggestions</h6>
-                  <div class="suggestions-container"></div>
-                      </div>
-                    </div>
-                  </div>
-          </div>
-                      {% endfor %}
-                  </div>
-                  </div>
-  </div>
-
-  <!-- Bottom Pagination -->
-  <div class="row mt-4">
-    <div class="col-12">
-      <nav aria-label="Page navigation">
-        <ul class="pagination justify-content-center">
-          <li class="page-item {% if page == 1 %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('search', page=page-1, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) if page > 1 else '#' }}" aria-label="Previous">
-              <span aria-hidden="true">&laquo;</span>
-            </a>
-          </li>
-          {% for p in range(max(1, page-2), min(pages+1, page+3)) %}
-            <li class="page-item {% if p == page %}active{% endif %}">
-              <a class="page-link" href="{{ url_for('search', page=p, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) }}">{{ p }}</a>
-            </li>
-                      {% endfor %}
-          <li class="page-item {% if page == pages %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('search', page=page+1, filter_loc=filter_loc, filter_platform=filter_platform, sort_by=sort_by, application_status=application_status) if page < pages else '#' }}" aria-label="Next">
-              <span aria-hidden="true">&raquo;</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-                    </div>
-                  </div>
-              </div>
-
-<!-- Loading Modal -->
-<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-body text-center p-4">
-        <div class="spinner-border text-primary mb-3" role="status">
-          <span class="visually-hidden">Loading...</span>
-              </div>
-        <h5 class="mb-0">Loading job details...</h5>
-            </div>
-          </div>
-  </div>
-</div>
-
-<style>
-  .job-list {
-    max-width: 100%;
-    margin: 0 auto;
-  }
-  
-  .job-description {
-    max-height: 200px;
-    overflow-y: auto;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #e9ecef;
-  }
-  
-  .description-content {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-size: 0.95rem;
-    line-height: 1.5;
-  }
-  
-  .hover-card {
-    transition: all 0.3s ease;
-  }
-  
-  .hover-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
-  }
-
-  /* Ensure proper scrolling */
-  .main-content {
-    overflow-x: hidden;
-  }
-
-  .card {
-    width: 100%;
-    margin-bottom: 1rem;
-  }
-
-  /* Pagination styles */
-  .pagination {
-    margin-bottom: 0;
-  }
-
-  .page-link {
-    color: #0d6efd;
-    border: 1px solid #dee2e6;
-    padding: 0.5rem 1rem;
-  }
-
-  .page-item.active .page-link {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-  }
-
-  .page-item.disabled .page-link {
-    color: #6c757d;
-    pointer-events: none;
-    background-color: #fff;
-    border-color: #dee2e6;
-  }
-
-  /* Improve responsive behavior */
-  @media (max-width: 768px) {
-    .card-body {
-      padding: 1rem;
-    }
-    
-    .job-description {
-      max-height: 150px;
-    }
-
-    .pagination {
-      flex-wrap: wrap;
-    }
-
-    .page-link {
-      padding: 0.375rem 0.75rem;
-    }
-  }
-
-  .match-analysis {
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-top: 1rem;
-  }
-
-  .match-score {
-    margin-bottom: 1.5rem;
-  }
-
-  .match-percentage {
-    font-size: 1.5rem;
-    font-weight: bold;
-    min-width: 60px;
-  }
-
-  .progress {
-    background-color: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  
-  .suggestion-card {
-    background-color: white;
-    border-radius: 8px;
-    border: 1px solid #e9ecef;
-    overflow: hidden;
-    margin-bottom: 1rem;
-  }
-  
-  .suggestion-header {
-    background-color: #e7f5ff;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e9ecef;
-    color: #0a58ca;
-  }
-  
-  .suggestion-body {
-    padding: 1rem;
-  }
-  
-  .action-items ul {
-    list-style-type: none;
-    padding-left: 0;
-    margin-bottom: 0;
-  }
-  
-  .action-items li {
-    position: relative;
-    padding-left: 1.5rem;
-    margin-bottom: 0.5rem;
-  }
-  
-  .action-items li:before {
-    content: "→";
-    position: absolute;
-    left: 0;
-    color: #0dcaf0;
-  }
-  
-  .action-items li:last-child {
-    margin-bottom: 0;
-  }
-  
-  .matched-skills .badge {
-    font-size: 0.85rem;
-    padding: 0.35em 0.65em;
-  }
-</style>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-  
-  // View Details functionality
-  document.querySelectorAll('.view-details').forEach(button => {
-    button.addEventListener('click', async function() {
-      const jobId = this.dataset.jobId;
-      loadingModal.show();
-      
-      try {
-        const response = await fetch(`/job_details/${jobId}`);
-        const job = await response.json();
-        
-        const card = this.closest('.card');
-        const descriptionContent = card.querySelector('.description-content');
-        if (descriptionContent) {
-          descriptionContent.innerHTML = job.description.replace(new RegExp('\\n', 'g'), '<br>');
-        }
-        
-        const matchAnalysis = card.querySelector('.match-analysis');
-        if (matchAnalysis) {
-          matchAnalysis.style.display = 'block';
-          
-          const matchScore = matchAnalysis.querySelector('.match-percentage');
-          const progressBar = matchAnalysis.querySelector('.progress-bar');
-          if (matchScore && progressBar && job.match_percentage !== undefined) {
-            matchScore.textContent = `${job.match_percentage}%`;
-            progressBar.style.width = `${job.match_percentage}%`;
-            progressBar.setAttribute('aria-valuenow', job.match_percentage);
-            progressBar.className = `progress-bar ${job.match_percentage >= 70 ? 'bg-success' : job.match_percentage >= 40 ? 'bg-warning' : 'bg-danger'}`;
-          }
-          
-          const skillsContainer = matchAnalysis.querySelector('.skills-container');
-          if (skillsContainer && job.matched_skills) {
-            let skillsHtml = '';
-            for (const [category, skills] of Object.entries(job.matched_skills)) {
-              if (skills && skills.length > 0) {
-                skillsHtml += `
-                  <div class="mb-2">
-                    <small class="text-muted">${category}:</small>
-                    <div>
-                      ${skills.map(skill => `<span class="badge bg-success me-1 mb-1">${skill}</span>`).join('')}
-                    </div>
-                  </div>
-                `;
-              }
-            }
-            skillsContainer.innerHTML = skillsHtml || '<p class="text-muted">No matched skills found.</p>';
-          }
-          
-          const suggestionsContainer = matchAnalysis.querySelector('.suggestions-container');
-          if (suggestionsContainer && job.suggestions) {
-            if (job.suggestions.length > 0) {
-              let suggestionsHtml = '';
-              job.suggestions.forEach(suggestion => {
-                suggestionsHtml += `
-                  <div class="suggestion-card mb-3">
-                    <div class="suggestion-header">
-                      <i class="bi bi-lightbulb me-2"></i>
-                      <strong>${suggestion.category}</strong>
-                    </div>
-                    <div class="suggestion-body">
-                      <p class="mb-2">${suggestion.suggestion}</p>
-                      ${suggestion.action_items ? `
-                        <div class="action-items">
-                          <small class="text-muted d-block mb-1">Recommended Actions:</small>
-                          <ul class="mb-0">
-                            ${suggestion.action_items.map(item => `<li>${item}</li>`).join('')}
-                          </ul>
-                        </div>
-                      ` : ''}
-                    </div>
-                  </div>
-                `;
-              });
-              suggestionsContainer.innerHTML = suggestionsHtml;
-            } else {
-              suggestionsContainer.innerHTML = '<p class="text-muted">No suggestions available.</p>';
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching job details:', error);
-        alert('Error loading job details. Please try again.');
-      } finally {
-        loadingModal.hide();
-      }
-    });
-  });
-});
-</script>
-''' + FOOTER
-
-TRACKER_HTML = NAVBAR + '''
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col-12">
-      <h2 class="display-5 mb-4 text-primary">Application Tracker</h2>
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="table-responsive">
-            <table class="table table-hover">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Title</th>
-                  <th>Status</th>
-                  <th>Date Applied</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-    <tbody>
-    {% for app in apps %}
-      <tr>
-        <td>{{app['job_id']}}</td>
-        <td>{{app['title']}}</td>
-                  <td>
-                    <span class="badge {% if app['status'] == 'Applied' %}bg-primary{% elif app['status'] == 'Rejected' %}bg-danger{% else %}bg-warning{% endif %}">
-                      {{app['status']}}
-                    </span>
-                  </td>
-        <td>{{app['applied_at']}}</td>
-        <td>
-          <form method="post" action="/update_status/{{app['id']}}" class="d-flex gap-2">
-            <select name="status" class="form-select form-select-sm">
-              {% for s in ['Applied','Rejected','No response'] %}
-                <option value="{{s}}" {% if s==app['status'] %}selected{% endif %}>{{s}}</option>
-              {% endfor %}
-            </select>
-            <input type="date" name="applied_at" value="{{app['applied_at']}}" class="form-control form-control-sm"/>
-                      <button class="btn btn-sm btn-primary">
-                        <i class="bi bi-save"></i>
-                      </button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-''' + FOOTER
-
-DETAILS_HTML = NAVBAR + '''
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col-12">
-      <h2 class="display-5 mb-4 text-primary">Resume Details</h2>
-      <div class="card shadow-sm">
-        <div class="card-body">
-  {% if resume %}
-            <div class="alert alert-info d-flex justify-content-between align-items-center">
-              <div>
-                <i class="bi bi-file-earmark-text me-2"></i>
-                Current Resume: <a href="/uploads/{{resume['filename']}}" class="alert-link" target="_blank">{{resume['filename']}}</a>
-                <small class="text-muted">(Uploaded: {{resume['uploaded_at']}})</small>
-              </div>
-              <form method="post" action="/delete_resume" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this resume?');">
-                <button type="submit" class="btn btn-outline-danger btn-sm">
-                  <i class="bi bi-trash"></i> Delete
-                </button>
-              </form>
-            </div>
-          {% else %}
-            <div class="alert alert-warning">
-              <i class="bi bi-exclamation-triangle me-2"></i>
-              No resume uploaded yet. Please upload your resume to track your applications.
-            </div>
-  {% endif %}
-
-          <form method="post" enctype="multipart/form-data" class="mt-4">
-            <div class="row g-3">
-              <div class="col-md-8">
-                <div class="input-group">
-                  <input type="file" name="file" class="form-control" accept=".pdf,.doc,.docx,.txt" required/>
-                  <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-upload me-2"></i>Upload Resume
-                  </button>
-                </div>
-                <small class="text-muted d-block mt-2">
-                  Supported formats: PDF, DOC, DOCX, TXT (Max size: 5MB)
-                </small>
-              </div>
-            </div>
-  </form>
-
-          {% if error %}
-            <div class="alert alert-danger mt-3">
-              <i class="bi bi-exclamation-circle me-2"></i>
-              {{ error }}
-</div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<style>
-  .alert {
-    border-radius: 8px;
-  }
-  
-  .alert-link {
-    text-decoration: none;
-  }
-  
-  .alert-link:hover {
-    text-decoration: underline;
-  }
-  
-  .input-group {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  }
-  
-  .form-control:focus {
-    box-shadow: none;
-    border-color: #0d6efd;
-  }
-</style>
-''' + FOOTER
-
-# ROUTES
-@app.route('/')
-def home(): return redirect(url_for('search'))
-
 @app.route('/search', methods=['GET','POST'])
 def search():
     conn = get_conn()
     try:
-        keyword = request.form.get('keyword','') if request.method=='POST' else ''
-        location = request.form.get('location','') if request.method=='POST' else ''
-        platform = request.form.get('platform','') if request.method=='POST' else ''
+        keyword = request.form.get('keyword','') if request.method=='POST' else request.args.get('keyword','')
+        location = request.form.get('location','') if request.method=='POST' else request.args.get('location','')
+        platform = request.form.get('platform','') if request.method=='POST' else request.args.get('platform','')
         
         if request.method=='POST':
             lst = fetch_all_jobs(keyword, location)
@@ -1679,8 +899,8 @@ def search():
         # Apply filters
         filter_loc = request.args.get('filter_loc','')
         filter_platform = request.args.get('filter_platform','')
-        sort_by = request.args.get('sort_by', 'recent')  # Default sort by recent
-        application_status = request.args.get('application_status', '')  # New filter
+        sort_by = request.args.get('sort_by', 'recent')
+        application_status = request.args.get('application_status', '')
         page = request.args.get('page',1,type=int)
         
         if filter_loc:
@@ -1745,137 +965,62 @@ def search():
                     resume_skills
                 )
                 
-                # Generate suggestions based on both resume and job description
-                suggestions = []
-                
-                # Add missing skills suggestions
-                for category, skills in missing_skills.items():
-                    if skills:
-                        # Check if any of these skills are mentioned in the job description
-                        relevant_skills = [skill for skill in skills if skill in row['description'].lower()]
-                        if relevant_skills:
-                            suggestions.append({
-                                'category': category,
-                                'suggestion': f"The job requires {', '.join(relevant_skills)} which are not found in your resume. Consider adding these skills.",
-                                'action_items': [
-                                    f"Add {skill} to your skills section" for skill in relevant_skills
-                                ]
-                            })
-                
-                # Add experience suggestions based on job requirements
-                experience_patterns = [
-                    r'(\d+)\+\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
-                    r'experience\s*(?:of)?\s*(\d+)\+\s*(?:years?|yrs?)'
-                ]
-                
-                for pattern in experience_patterns:
-                    matches = re.finditer(pattern, row['description'].lower())
-                    for match in matches:
-                        years = match.group(1)
-                        # Check if the resume mentions any experience
-                        if not re.search(r'\d+\s*(?:years?|yrs?)\s*(?:of)?\s*experience', resume_text.lower()):
-                            suggestions.append({
-                                'category': 'Experience',
-                                'suggestion': f"The job requires {years}+ years of experience. Your resume should clearly state your years of experience.",
-                                'action_items': [
-                                    "Add specific years of experience in your work history",
-                                    "Quantify your experience with concrete examples",
-                                    "Highlight relevant projects and achievements"
-                                ]
-                            })
-                
-                # Add education suggestions based on job requirements
-                education_keywords = ['bachelor', 'master', 'phd', 'degree', 'diploma', 'certification']
-                job_education = [keyword for keyword in education_keywords if keyword in row['description'].lower()]
-                resume_education = [keyword for keyword in education_keywords if keyword in resume_text.lower()]
-                
-                missing_education = [edu for edu in job_education if edu not in resume_education]
-                if missing_education:
-                    suggestions.append({
-                        'category': 'Education',
-                        'suggestion': f"The job requires {', '.join(missing_education)} qualifications. Make sure your education section is complete.",
-                        'action_items': [
-                            "List your highest education degree first",
-                            "Include relevant certifications",
-                            "Highlight relevant coursework and achievements"
-                        ]
-                    })
-                
-                # Add soft skills suggestions
-                soft_skills = ['communication', 'leadership', 'teamwork', 'problem-solving', 'time management', 'collaboration']
-                job_soft_skills = [skill for skill in soft_skills if skill in row['description'].lower()]
-                resume_soft_skills = [skill for skill in soft_skills if skill in resume_text.lower()]
-                
-                missing_soft_skills = [skill for skill in job_soft_skills if skill not in resume_soft_skills]
-                if missing_soft_skills:
-                    suggestions.append({
-                        'category': 'Soft Skills',
-                        'suggestion': f"The job emphasizes {', '.join(missing_soft_skills)}. Add examples of these skills in your experience.",
-                        'action_items': [
-                            f"Add specific examples of {skill} in your work experience" for skill in missing_soft_skills
-                        ]
-                    })
-                
-                # Add industry-specific suggestions
-                industry_keywords = ['industry', 'sector', 'domain', 'field']
-                if any(keyword in row['description'].lower() for keyword in industry_keywords):
-                    # Check if resume mentions any industry experience
-                    if not any(keyword in resume_text.lower() for keyword in industry_keywords):
-                        suggestions.append({
-                            'category': 'Industry Experience',
-                            'suggestion': "The job requires specific industry experience. Highlight your relevant industry background.",
-                            'action_items': [
-                                "List relevant industry experience",
-                                "Highlight industry-specific projects",
-                                "Mention industry certifications if any"
-                            ]
-                        })
-                
                 row['match_percentage'] = round(match_percentage, 1)
                 row['matched_skills'] = matched_skills
                 row['missing_skills'] = missing_skills
-                row['suggestions'] = suggestions
+                row['suggestions'] = generate_improvement_suggestions(missing_skills, row['description'])
         
-        return render_template_string(
-            SEARCH_HTML,
-            keyword=keyword,
-            location=location,
-            platform=platform,
-            filter_loc=filter_loc,
-            filter_platform=filter_platform,
-            sort_by=sort_by,
-            application_status=application_status,
-            page=page,
-            pages=pages,
-            rows=rows,
-            locations=locations,
-            platforms=platforms,
-            max=max,  # Add max function to template context
-            min=min   # Add min function to template context
-        )
+        return jsonify({
+            'jobs': rows,
+            'total': total,
+            'pages': pages,
+            'current_page': page,
+            'locations': locations,
+            'platforms': platforms
+        })
     finally:
         conn.close()
 
-@app.route('/tracker', methods=['GET','POST'])
+@app.route('/api/tracker', methods=['GET'])
 def tracker():
-    conn = get_conn(); apps = conn.execute('SELECT a.id,a.job_id,a.status,a.applied_at,j.title FROM applications a JOIN jobs j ON a.job_id=j.id').fetchall(); conn.close()
+    conn = get_conn()
+    apps = conn.execute('SELECT a.id,a.job_id,a.status,a.applied_at,j.title FROM applications a JOIN jobs j ON a.job_id=j.id').fetchall()
+    conn.close()
     apps = [dict(a) for a in apps]
-    return render_template_string(TRACKER_HTML,apps=apps)
+    return jsonify({'applications': apps})
 
-@app.route('/update_status/<int:id>', methods=['POST'])
-def update_status(id):
-    status = request.form['status']; date = request.form['applied_at']
-    conn=get_conn(); conn.execute('UPDATE applications SET status=?,applied_at=? WHERE id=?',(status,date,id)); conn.commit(); conn.close()
-    return redirect(url_for('tracker'))
+@app.route('/api/saved_jobs', methods=['GET'])
+def saved_jobs():
+    conn = get_conn()
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = PER_PAGE
+        all_jobs = conn.execute('''
+            SELECT j.*, sj.saved_at 
+            FROM jobs j 
+            JOIN saved_jobs sj ON j.id = sj.job_id 
+            ORDER BY sj.saved_at DESC
+        ''').fetchall()
+        total = len(all_jobs)
+        pages = (total + per_page - 1) // per_page
+        page = max(1, min(page, pages)) if pages > 0 else 1
+        jobs = all_jobs[(page-1)*per_page : page*per_page]
+        jobs = [dict(job) for job in jobs]
+        return jsonify({
+            'saved_jobs': jobs,
+            'total': total,
+            'pages': pages,
+            'current_page': page
+        })
+    finally:
+        conn.close()
 
-@app.route('/details', methods=['GET', 'POST'])
+@app.route('/api/details', methods=['GET', 'POST'])
 def details():
     error = None
     conn = get_conn()
     res = conn.execute('SELECT * FROM resume ORDER BY uploaded_at DESC LIMIT 1').fetchone()
-    conn.close()
     resume = dict(res) if res else None
-
     if request.method == 'POST':
         if 'file' not in request.files:
             error = 'No file selected'
@@ -1887,42 +1032,34 @@ def details():
                 error = 'Invalid file type. Please upload PDF, DOC, DOCX, or TXT files only.'
             else:
                 try:
-                    # Create uploads directory if it doesn't exist
                     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                    
-                    # Check file size (5MB limit)
                     file_content = file.read()
                     file_size = len(file_content)
-                    file.seek(0)  # Reset file pointer
-                    
-                    if file_size > 5 * 1024 * 1024:  # 5MB in bytes
+                    file.seek(0)
+                    if file_size > 5 * 1024 * 1024:
                         error = 'File size exceeds 5MB limit'
                     else:
-                        # Delete old resume if exists
                         if resume:
                             old_file_path = os.path.join(app.config['UPLOAD_FOLDER'], resume['filename'])
                             if os.path.exists(old_file_path):
                                 os.remove(old_file_path)
-                        
-                        # Save new resume
                         filename = secure_filename(file.filename)
                         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                         file.save(file_path)
-                        
-                        # Update database
                         conn = get_conn()
                         conn.execute('INSERT INTO resume (filename, uploaded_at) VALUES (?,?)',
                                    (filename, datetime.now().strftime('%Y-%m-%d %H:%M')))
                         conn.commit()
                         conn.close()
-                        
-                        return redirect(url_for('details'))
+                        resume = {'filename': filename, 'uploaded_at': datetime.now().strftime('%Y-%m-%d %H:%M')}
                 except Exception as e:
                     error = f'Error uploading file: {str(e)}'
+    conn.close()
+    if error:
+        return jsonify({'error': error})
+    return jsonify({'resume': resume})
 
-    return render_template_string(DETAILS_HTML, resume=resume, error=error)
-
-@app.route('/delete_resume', methods=['POST'])
+@app.route('/api/delete_resume', methods=['POST'])
 def delete_resume():
     conn = get_conn()
     res = conn.execute('SELECT filename FROM resume ORDER BY uploaded_at DESC LIMIT 1').fetchone()
@@ -1940,20 +1077,22 @@ def delete_resume():
         conn.commit()
     
     conn.close()
-    return redirect(url_for('details'))
+    return jsonify({'status': 'success'})
 
-@app.route('/uploads/<path:filename>')
-def download(filename): return send_from_directory(app.config['UPLOAD_FOLDER'],filename)
+@app.route('/api/uploads/<path:filename>')
+def download(filename): 
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/_ping')
-def ping(): return 'pong'
+@app.route('/api/_ping')
+def ping(): 
+    return jsonify({'status': 'pong'})
 
-@app.route('/init-db')
+@app.route('/api/init-db')
 def init_db_route():
     init_db()
-    return 'Database initialized successfully!'
+    return jsonify({'status': 'success', 'message': 'Database initialized successfully!'})
 
-@app.route('/job_details/<int:job_id>')
+@app.route('/api/job_details/<int:job_id>')
 def job_details(job_id):
     print(f"\nFetching job details for job_id: {job_id}")
     conn = get_conn()
@@ -2088,9 +1227,10 @@ def job_details(job_id):
                 'category': 'Industry Experience',
                 'suggestion': "The job requires specific industry experience. Highlight your relevant industry background.",
                 'action_items': [
-                    "List relevant industry experience",
-                    "Highlight industry-specific projects",
-                    "Mention industry certifications if any"
+                    "List relevant industry experience prominently",
+                    "Highlight industry-specific projects and achievements",
+                    "Mention industry certifications and training",
+                    "Include industry-specific tools and technologies you've used"
                 ]
             })
         
@@ -2135,8 +1275,75 @@ def job_details(job_id):
     
     return jsonify(job)
 
-# RUNNING
-# python3 -m flask --app app.py --debug run
+@app.route('/api/update_application_status/<int:job_id>', methods=['POST'])
+def update_application_status(job_id):
+    conn = None
+    try:
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({'status': 'error', 'message': 'Status is required'}), 400
+        
+        conn = get_conn()
+        
+        # Check if job exists
+        job = conn.execute('SELECT id FROM jobs WHERE id = ?', (job_id,)).fetchone()
+        if not job:
+            return jsonify({'status': 'error', 'message': 'Job not found'}), 404
+            
+        # Check if application exists
+        application = conn.execute('SELECT id FROM applications WHERE job_id = ?', (job_id,)).fetchone()
+        if not application:
+            return jsonify({'status': 'error', 'message': 'No application found for this job'}), 404
+            
+        if new_status == 'Not Applied':
+            # Remove the application record
+            conn.execute('DELETE FROM applications WHERE job_id = ?', (job_id,))
+        else:
+            # Update the application status for other statuses
+            conn.execute('UPDATE applications SET status = ? WHERE job_id = ?',
+                        (new_status, job_id))
+        
+        conn.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        print(f"Error updating application status: {str(e)}")
+        if conn:
+            conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/search', methods=['GET','POST'])
+def api_search():
+    return search()
+
+@app.route('/api/save_job/<int:job_id>', methods=['POST', 'DELETE'])
+def save_job(job_id):
+    conn = get_conn()
+    try:
+        if request.method == 'POST':
+            # Check if already saved
+            exists = conn.execute('SELECT 1 FROM saved_jobs WHERE job_id = ?', (job_id,)).fetchone()
+            if exists:
+                return jsonify({'status': 'already_saved'})
+            conn.execute('INSERT INTO saved_jobs (job_id, saved_at) VALUES (?, ?)', (job_id, datetime.now()))
+            conn.commit()
+            return jsonify({'status': 'success'})
+        elif request.method == 'DELETE':
+            # Unsave job
+            exists = conn.execute('SELECT 1 FROM saved_jobs WHERE job_id = ?', (job_id,)).fetchone()
+            if not exists:
+                return jsonify({'status': 'not_saved'})
+            conn.execute('DELETE FROM saved_jobs WHERE job_id = ?', (job_id,))
+            conn.commit()
+            return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        conn.close()
 
 # Download required NLTK data
 try:
@@ -2473,658 +1680,25 @@ def generate_improvement_suggestions(missing_skills, job_description):
     
     return suggestions
 
-# Add the SAVED_JOBS_HTML template
-SAVED_JOBS_HTML = NAVBAR + '''
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col-12">
-      <h2 class="display-5 mb-4 text-primary">Saved Jobs</h2>
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="row">
-            <div class="col-12">
-              <div class="job-list">
-                {% for job in saved_jobs %}
-                  <div class="card mb-3 hover-card">
-                    <div class="card-body">
-                      <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="flex-grow-1">
-                          <h5 class="card-title mb-1">
-                            <a href="{{ job['url'] }}" target="_blank" class="text-decoration-none">{{ job['title'] }}</a>
-                            {% if job.get('match_percentage') is not none %}
-                            <span class="badge {{ 'bg-success' if job.get('match_percentage') >= 70 else 'bg-warning' if job.get('match_percentage') >= 40 else 'bg-danger' }} ms-2">
-                              {{ job.get('match_percentage') }}% Match
-                            </span>
-                            {% endif %}
-                          </h5>
-                          <h6 class="card-subtitle mb-2 text-muted">{{ job['company'] }}</h6>
-                          <div class="d-flex align-items-center text-muted mb-2">
-                            <small class="me-3"><i class="bi bi-geo-alt"></i> {{ job['location'] }}</small>
-                            <small class="me-3"><i class="bi bi-calendar"></i> Saved on {{ job['saved_at'] }}</small>
-                            <small><i class="bi bi-globe"></i> {{ job['platform'] }}</small>
-                          </div>
-                        </div>
-                        <div class="d-flex gap-2">
-                          <button class="btn btn-sm btn-outline-primary view-details" data-job-id="{{ job['id'] }}">
-                            <i class="bi bi-eye"></i> Details
-                          </button>
-                          <button class="btn btn-sm btn-outline-danger unsave-job" data-job-id="{{ job['id'] }}">
-                            <i class="bi bi-bookmark-x"></i> Unsave
-                          </button>
-                          <button class="btn btn-sm btn-outline-primary apply-job" data-job-id="{{ job['id'] }}" type="button">
-                            <i class="bi bi-send"></i> Apply
-                          </button>
-                        </div>
-                      </div>
-                      <p class="card-text description-content">{{ job['description'] }}</p>
-                      
-                      <!-- AI Job Match Analysis Section - Initially Hidden -->
-                      <div class="match-analysis mt-4" style="display: none;">
-                        <h6 class="mb-3">AI Job Match Analysis</h6>
-                        
-                        <!-- Match Score -->
-                        <div class="match-score mb-3">
-                          <div class="d-flex align-items-center">
-                            <div class="match-percentage me-2">0%</div>
-                            <div class="progress flex-grow-1" style="height: 8px;">
-                              <div class="progress-bar"
-                                   role="progressbar"
-                                   style="width: 0%"
-                                   aria-valuenow="0"
-                                   aria-valuemin="0"
-                                   aria-valuemax="100"></div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Matched Skills -->
-                        <div class="matched-skills mb-3">
-                          <h6 class="mb-2">Matched Skills</h6>
-                          <div class="skills-container"></div>
-                        </div>
-
-                        <!-- Suggestions -->
-                        <div class="suggestions">
-                          <h6 class="mb-2">Improvement Suggestions</h6>
-                          <div class="suggestions-container"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<style>
-  .job-list {
-    max-width: 100%;
-    margin: 0 auto;
-  }
-  
-  .hover-card {
-    transition: all 0.3s ease;
-  }
-  
-  .hover-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
-  }
-  
-  .description-content {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    color: #6c757d;
-  }
-  
-  .match-analysis {
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-top: 1rem;
-  }
-  
-  .match-score {
-    margin-bottom: 1.5rem;
-  }
-  
-  .match-percentage {
-    font-size: 1.5rem;
-    font-weight: bold;
-    min-width: 60px;
-  }
-  
-  .progress {
-    background-color: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  
-  .suggestion-card {
-    background-color: white;
-    border-radius: 8px;
-    border: 1px solid #e9ecef;
-    overflow: hidden;
-    margin-bottom: 1rem;
-  }
-  
-  .suggestion-header {
-    background-color: #e7f5ff;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e9ecef;
-    color: #0a58ca;
-  }
-  
-  .suggestion-body {
-    padding: 1rem;
-  }
-  
-  .action-items ul {
-    list-style-type: none;
-    padding-left: 0;
-    margin-bottom: 0;
-  }
-  
-  .action-items li {
-    position: relative;
-    padding-left: 1.5rem;
-    margin-bottom: 0.5rem;
-  }
-  
-  .action-items li:before {
-    content: "→";
-    position: absolute;
-    left: 0;
-    color: #0dcaf0;
-  }
-  
-  .action-items li:last-child {
-    margin-bottom: 0;
-  }
-  
-  .matched-skills .badge {
-    font-size: 0.85rem;
-    padding: 0.35em 0.65em;
-  }
-  
-  .card {
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  }
-  
-  .btn {
-    font-weight: 500;
-  }
-  
-  .badge {
-    font-weight: 500;
-  }
-  
-  .text-muted {
-    color: #6c757d !important;
-  }
-  
-  .bi {
-    margin-right: 0.25rem;
-  }
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-  
-  // View Details functionality
-  document.querySelectorAll('.view-details').forEach(button => {
-    button.addEventListener('click', async function() {
-      const jobId = this.dataset.jobId;
-      loadingModal.show();
-      
-      try {
-        const response = await fetch(`/job_details/${jobId}`);
-        const job = await response.json();
-        
-        const card = this.closest('.card');
-        const descriptionContent = card.querySelector('.description-content');
-        if (descriptionContent) {
-          descriptionContent.innerHTML = job.description.replace(new RegExp('\\n', 'g'), '<br>');
-        }
-        
-        const matchAnalysis = card.querySelector('.match-analysis');
-        if (matchAnalysis) {
-          matchAnalysis.style.display = 'block';
-          
-          const matchScore = matchAnalysis.querySelector('.match-percentage');
-          const progressBar = matchAnalysis.querySelector('.progress-bar');
-          if (matchScore && progressBar && job.match_percentage !== undefined) {
-            matchScore.textContent = `${job.match_percentage}%`;
-            progressBar.style.width = `${job.match_percentage}%`;
-            progressBar.setAttribute('aria-valuenow', job.match_percentage);
-            progressBar.className = `progress-bar ${job.match_percentage >= 70 ? 'bg-success' : job.match_percentage >= 40 ? 'bg-warning' : 'bg-danger'}`;
-          }
-          
-          const skillsContainer = matchAnalysis.querySelector('.skills-container');
-          if (skillsContainer && job.matched_skills) {
-            let skillsHtml = '';
-            for (const [category, skills] of Object.entries(job.matched_skills)) {
-              if (skills && skills.length > 0) {
-                skillsHtml += `
-                  <div class="mb-2">
-                    <small class="text-muted">${category}:</small>
-                    <div>
-                      ${skills.map(skill => `<span class="badge bg-success me-1 mb-1">${skill}</span>`).join('')}
-                    </div>
-                  </div>
-                `;
-              }
-            }
-            skillsContainer.innerHTML = skillsHtml || '<p class="text-muted">No matched skills found.</p>';
-          }
-          
-          const suggestionsContainer = matchAnalysis.querySelector('.suggestions-container');
-          if (suggestionsContainer && job.suggestions) {
-            if (job.suggestions.length > 0) {
-              let suggestionsHtml = '';
-              job.suggestions.forEach(suggestion => {
-                suggestionsHtml += `
-                  <div class="suggestion-card mb-3">
-                    <div class="suggestion-header">
-                      <i class="bi bi-lightbulb me-2"></i>
-                      <strong>${suggestion.category}</strong>
-                    </div>
-                    <div class="suggestion-body">
-                      <p class="mb-2">${suggestion.suggestion}</p>
-                      ${suggestion.action_items ? `
-                        <div class="action-items">
-                          <small class="text-muted d-block mb-1">Recommended Actions:</small>
-                          <ul class="mb-0">
-                            ${suggestion.action_items.map(item => `<li>${item}</li>`).join('')}
-                          </ul>
-                        </div>
-                      ` : ''}
-                    </div>
-                  </div>
-                `;
-              });
-              suggestionsContainer.innerHTML = suggestionsHtml;
-            } else {
-              suggestionsContainer.innerHTML = '<p class="text-muted">No suggestions available.</p>';
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching job details:', error);
-        alert('Error loading job details. Please try again.');
-      } finally {
-        loadingModal.hide();
-      }
-    });
-  });
-  
-  // Unsave Job functionality
-  document.querySelectorAll('.unsave-job').forEach(button => {
-    button.addEventListener('click', async function() {
-      const jobId = this.dataset.jobId;
-      try {
-        const response = await fetch(`/unsave_job/${jobId}`, { method: 'POST' });
-        if (response.ok) {
-          const card = this.closest('.card');
-          card.remove();
-        } else {
-          alert('Error unsaving job. Please try again.');
-        }
-      } catch (error) {
-        console.error('Error unsaving job:', error);
-        alert('Error unsaving job. Please try again.');
-      }
-    });
-  });
-  
-  // Initialize apply buttons
-  document.querySelectorAll('.apply-job').forEach(button => {
-    button.addEventListener('click', async function(e) {
-      e.preventDefault();
-      const jobId = this.dataset.jobId;
-      
-      try {
-        const response = await fetch(`/apply_job/${jobId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-          // Replace Apply button with Didn't Apply button
-          const didntApplyButton = document.createElement('button');
-          didntApplyButton.className = 'btn btn-sm btn-outline-danger didnt-apply';
-          didntApplyButton.dataset.jobId = jobId;
-          didntApplyButton.type = 'button';
-          didntApplyButton.innerHTML = '<i class="bi bi-x-circle"></i> Didn\'t Apply';
-          this.replaceWith(didntApplyButton);
-          
-          // Add the applied icon to the title
-          const card = this.closest('.card');
-          const titleLink = card.querySelector('.card-title a');
-          if (titleLink && !titleLink.querySelector('.bi-check-circle-fill')) {
-            const appliedIcon = document.createElement('i');
-            appliedIcon.className = 'bi bi-check-circle-fill text-success ms-2';
-            appliedIcon.title = 'Applied';
-            titleLink.appendChild(appliedIcon);
-          }
-          
-          // Show success message
-          const alert = document.createElement('div');
-          alert.className = 'alert alert-success alert-dismissible fade show mt-3';
-          alert.innerHTML = `
-            <i class="bi bi-check-circle me-2"></i>
-            Application recorded! You can track your application status in the Application Tracker.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          `;
-          card.querySelector('.card-body').appendChild(alert);
-          
-          // Get the job URL and open it in a new tab
-          const jobUrl = card.querySelector('.card-title a').href;
-          window.open(jobUrl, '_blank');
-          
-          // Initialize the didn't apply button
-          initializeDidntApplyButton(didntApplyButton);
-        } else if (data.status === 'already_applied') {
-          alert('You have already applied to this job.');
-        } else {
-          alert('Error recording application. Please try again.');
-        }
-      } catch (error) {
-        console.error('Error applying to job:', error);
-        alert('Error recording application. Please try again.');
-      }
-    });
-  });
-  
-  // Initialize didn't apply buttons
-  document.querySelectorAll('.didnt-apply').forEach(button => {
-    button.addEventListener('click', async function(e) {
-      e.preventDefault();
-      const jobId = this.dataset.jobId;
-      
-      try {
-        const response = await fetch(`/update_application_status/${jobId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({ status: 'Not Applied' })
-        });
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-          // Replace the button with Apply button
-          const applyButton = document.createElement('button');
-          applyButton.className = 'btn btn-sm btn-outline-primary apply-job';
-          applyButton.dataset.jobId = jobId;
-          applyButton.type = 'button';
-          applyButton.innerHTML = '<i class="bi bi-send"></i> Apply';
-          this.replaceWith(applyButton);
-          
-          // Remove the applied icon
-          const card = this.closest('.card');
-          const appliedIcon = card.querySelector('.bi-check-circle-fill');
-          if (appliedIcon) {
-            appliedIcon.remove();
-          }
-          
-          // Show success message
-          const alert = document.createElement('div');
-          alert.className = 'alert alert-info alert-dismissible fade show mt-3';
-          alert.innerHTML = `
-            <i class="bi bi-info-circle me-2"></i>
-            Application status updated to "Not Applied".
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          `;
-          card.querySelector('.card-body').appendChild(alert);
-          
-          // Reinitialize the apply button
-          initializeApplyButton(applyButton);
-        } else {
-          alert('Error updating application status. Please try again.');
-        }
-      } catch (error) {
-        console.error('Error updating application status:', error);
-        alert('Error updating application status. Please try again.');
-      }
-    });
-  });
-  
-  function initializeApplyButton(button) {
-    button.addEventListener('click', async function(e) {
-      e.preventDefault();
-      const jobId = this.dataset.jobId;
-      
-      try {
-        const response = await fetch(`/apply_job/${jobId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-          this.innerHTML = '<i class="bi bi-check-circle"></i> Applied';
-          this.classList.remove('btn-outline-primary');
-          this.classList.add('btn-success');
-          this.disabled = true;
-          
-          // Show success message
-          const card = this.closest('.card');
-          const alert = document.createElement('div');
-          alert.className = 'alert alert-success alert-dismissible fade show mt-3';
-          alert.innerHTML = `
-            <i class="bi bi-check-circle me-2"></i>
-            Application recorded! You can track your application status in the Application Tracker.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          `;
-          card.querySelector('.card-body').appendChild(alert);
-          
-          // Get the job URL and open it in a new tab
-          const jobUrl = card.querySelector('.card-title a').href;
-          window.open(jobUrl, '_blank');
-        } else if (data.status === 'already_applied') {
-          alert('You have already applied to this job.');
-        } else {
-          alert('Error recording application. Please try again.');
-        }
-      } catch (error) {
-        console.error('Error applying to job:', error);
-        alert('Error recording application. Please try again.');
-      }
-    });
-  }
-});
-</script>
-
-<style>
-  .suggestions .alert {
-    border-left: 4px solid #0dcaf0;
-  }
-  
-  .suggestions .alert ul {
-    list-style-type: none;
-  }
-  
-  .suggestions .alert li {
-    position: relative;
-    padding-left: 1.5rem;
-  }
-  
-  .suggestions .alert li:before {
-    content: "•";
-    position: absolute;
-    left: 0.5rem;
-    color: #0dcaf0;
-  }
-  
-  .suggestions .alert strong {
-    color: #0a58ca;
-  }
-  
-  .suggestions .alert small {
-    font-size: 0.875rem;
-  }
-</style>
-''' + FOOTER
-
-# Add new routes for saved jobs functionality
-@app.route('/save_job/<int:job_id>', methods=['POST'])
-def save_job(job_id):
-    conn = get_conn()
-    try:
-        # Check if job exists
-        job = conn.execute('SELECT id FROM jobs WHERE id = ?', (job_id,)).fetchone()
-        if not job:
-            return jsonify({'status': 'error', 'message': 'Job not found'}), 404
-
-        # Check if job is already saved
-        existing = conn.execute('SELECT id FROM saved_jobs WHERE job_id = ?', (job_id,)).fetchone()
-        if existing:
-            return jsonify({'status': 'already_saved'})
-
-        # Save the job
-        conn.execute('INSERT INTO saved_jobs (job_id, saved_at) VALUES (?, ?)',
-                    (job_id, datetime.now()))
-        conn.commit()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        print(f"Error saving job: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-    finally:
-        conn.close()
-
-@app.route('/unsave_job/<int:job_id>', methods=['POST'])
-def unsave_job(job_id):
-    conn = get_conn()
-    try:
-        conn.execute('DELETE FROM saved_jobs WHERE job_id = ?', (job_id,))
-        conn.commit()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        print(f"Error unsaving job: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-    finally:
-        conn.close()
-
-@app.route('/saved_jobs')
-def saved_jobs():
-    conn = get_conn()
-    saved_jobs = conn.execute('''
-        SELECT j.*, sj.saved_at 
-        FROM jobs j 
-        JOIN saved_jobs sj ON j.id = sj.job_id 
-        ORDER BY sj.saved_at DESC
-    ''').fetchall()
-    conn.close()
-    
-    saved_jobs = [dict(job) for job in saved_jobs]
-    
-    # Calculate match percentage for each saved job
-    resume = get_conn().execute('SELECT * FROM resume ORDER BY uploaded_at DESC LIMIT 1').fetchone()
-    if resume:
-        resume_path = os.path.join(app.config['UPLOAD_FOLDER'], resume['filename'])
-        resume_text = extract_text_from_file(resume_path)
-        resume_skills, _ = extract_skills_from_text(resume_text)
-        
-        for job in saved_jobs:
-            if job['description'] and job['description'] != 'Click "Details" to view full description':
-                match_percentage, matched_skills, _ = calculate_job_match(
-                    job['description'],
-                    resume_skills
-                )
-                job['match_percentage'] = round(match_percentage, 1)
-                job['matched_skills'] = matched_skills
-    
-    return render_template_string(SAVED_JOBS_HTML, saved_jobs=saved_jobs)
-
-# Add the apply job route
-@app.route('/apply_job/<int:job_id>', methods=['POST'])
-def apply_job(job_id):
-    conn = None
-    try:
-        conn = get_conn()
-        
-        # Check if job exists
-        job = conn.execute('SELECT id FROM jobs WHERE id = ?', (job_id,)).fetchone()
-        if not job:
-            return jsonify({'status': 'error', 'message': 'Job not found'}), 404
-
-        # Check if already applied
-        existing = conn.execute('SELECT id FROM applications WHERE job_id = ?', (job_id,)).fetchone()
-        if existing:
-            return jsonify({'status': 'already_applied'})
-
-        # Add to applications
-        conn.execute('INSERT INTO applications (job_id, status, applied_at) VALUES (?, ?, ?)',
-                    (job_id, 'Applied', datetime.now().strftime('%Y-%m-%d')))
-        conn.commit()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        print(f"Error applying to job: {str(e)}")
-        if conn:
-            conn.rollback()
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
-
-@app.route('/update_application_status/<int:job_id>', methods=['POST'])
-def update_application_status(job_id):
-    conn = None
-    try:
-        data = request.get_json()
-        new_status = data.get('status')
-        
-        if not new_status:
-            return jsonify({'status': 'error', 'message': 'Status is required'}), 400
-        
-        conn = get_conn()
-        
-        # Check if job exists
-        job = conn.execute('SELECT id FROM jobs WHERE id = ?', (job_id,)).fetchone()
-        if not job:
-            return jsonify({'status': 'error', 'message': 'Job not found'}), 404
-            
-        # Check if application exists
-        application = conn.execute('SELECT id FROM applications WHERE job_id = ?', (job_id,)).fetchone()
-        if not application:
-            return jsonify({'status': 'error', 'message': 'No application found for this job'}), 404
-            
-        if new_status == 'Not Applied':
-            # Remove the application record
-            conn.execute('DELETE FROM applications WHERE job_id = ?', (job_id,))
-        else:
-            # Update the application status for other statuses
-            conn.execute('UPDATE applications SET status = ? WHERE job_id = ?',
-                        (new_status, job_id))
-        
-        conn.commit()
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        print(f"Error updating application status: {str(e)}")
-        if conn:
-            conn.rollback()
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-    finally:
-        if conn:
-            conn.close()
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'init-db':
+        init_db()
+        print('Database initialized successfully!')
+    else:
+        # Download required NLTK data
+        nltk.download('stopwords')
+        nltk.download('punkt')
+        nltk.download('averaged_perceptron_tagger')
+        nltk.download('wordnet')
+        # Load spaCy model
+        try:
+            nlp = spacy.load('en_core_web_sm')
+        except OSError:
+            print("Downloading spaCy model...")
+            spacy.cli.download('en_core_web_sm')
+            nlp = spacy.load('en_core_web_sm')
+        # Create uploads directory if it doesn't exist
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        # Run the app
+        app.run(host=app.config['HOST'], port=app.config['PORT'], debug=True)

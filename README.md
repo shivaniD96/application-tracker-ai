@@ -1,85 +1,91 @@
 # Job Application Tracker
 
-A Flask-based web application to help you track your job applications, search for jobs, and manage your resume.
+A full-stack application for searching, saving, and tracking job applications. The backend is built with Flask (Python), and the frontend is built with Next.js (React + Material UI).
+
+---
+
+## Prerequisites
+- **Python 3.9** (for backend)
+- **Node.js 18+** and **Yarn** or **npm** (for frontend)
+- **pip** (Python package manager)
+
+---
+
+## Backend (Flask API)
+
+### 1. Setup Python Environment
+```bash
+cd api
+make setup
+source venv/bin/activate
+```
+
+### 2. Install Python Dependencies
+```bash
+make install
+```
+
+### 3. Run the Backend Server
+```bash
+make run
+```
+
+### 4. To **deactivate** the virtual environment, simply run:
+```bash
+deactivate
+```
+
+- The backend will start on [http://localhost:5000](http://localhost:5000)
+- The first run will initialize the SQLite database (`jobs.db`).
+
+#### Notes
+- If you see errors about missing NLTK or spaCy models, the app will attempt to download them automatically.
+- If you change the database schema, delete `api/jobs.db` and restart.
+
+---
+
+## Frontend (Next.js + Material UI)
+
+### 1. Setup Frontend
+```bash
+cd web
+```
+
+### 2. Install Node.js Dependencies
+```bash
+yarn install
+```
+
+### 3. Run the Frontend Dev Server
+```bash
+yarn run dev
+```
+- The frontend will start on [http://localhost:3000](http://localhost:3000)
+
+#### Notes
+- The frontend expects the backend to be running at `http://localhost:5000`.
+- If you want to change the backend URL, set the environment variable `NEXT_PUBLIC_API_BASE_URL` in a `.env.local` file in the `web` directory.
+
+---
 
 ## Features
+- Search for jobs (aggregates from multiple sources)
+- Save jobs, unsave, and apply
+- Track applications
+- Upload and analyze your resume
+- Material UI for a modern, responsive interface
+- Pagination for job and saved job lists
 
-- 🔍 Job Search: Search for jobs with keywords and location filters
-- 📊 Application Tracker: Track the status of your job applications
-- 📝 Resume Management: Upload and manage your resume
-- 📅 Application Timeline: Keep track of when you applied and follow-ups
-- 🔄 Status Updates: Update application status (Applied, Rejected, No response)
-- 🌐 Multiple Job Boards: Search across LinkedIn, Indeed, Adzuna, and ZipRecruiter
+---
 
-## Setup Instructions
+## Troubleshooting
+- **CORS errors:** Make sure Flask is running with CORS enabled (already set up in `api/app.py`).
+- **Port conflicts:** Ensure nothing else is running on ports 3000 (frontend) or 5000 (backend).
+- **Database issues:** Delete `api/jobs.db` and restart the backend to reinitialize.
+- **Missing Python packages:** Run `pip install -r requirements.txt` again (from the `api` directory).
+- **Node errors:** Delete `node_modules` and `yarn.lock`/`package-lock.json`, then reinstall dependencies.
 
-1. Clone the repository:
-```bash
-git clone https://github.com/shivaniD96/application-tracker-ai.git
-cd application-tracker-ai
-```
+---
 
-2. Create a virtual environment and activate it:
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows, use: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Set up API keys:
-   Create a `.env` file in the project root with the following content:
-   ```
-   # Adzuna API Credentials
-   ADZUNA_API_KEY=your_adzuna_api_key
-   ADZUNA_API_SECRET=your_adzuna_api_secret
-
-   # Indeed API Credentials
-   INDEED_PUBLISHER_ID=your_indeed_publisher_id
-
-   # LinkedIn API Credentials
-   LINKEDIN_CLIENT_ID=your_linkedin_client_id
-   LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
-
-   # ZipRecruiter API Credentials
-   ZIPRECRUITER_API_KEY=your_ziprecruiter_api_key
-   ```
-
-   To get API keys:
-   - Adzuna: https://developer.adzuna.com/
-   - Indeed: https://www.indeed.com/publisher
-   - LinkedIn: https://developer.linkedin.com/
-   - ZipRecruiter: https://www.ziprecruiter.com/publishers
-
-5. Initialize the database:
-```bash
-python3 -m flask --app app.py init-db
-```
-
-6. Run the application:
-```bash
-python3 -m flask --app app.py --debug run
-```
-
-7. Open your browser and navigate to `http://localhost:5000`
-
-## Project Structure
-
-- `app.py` - Main Flask application
-- `uploads/` - Directory for storing uploaded resumes
-- `jobs.db` - SQLite database for storing job listings and applications
-
-## Dependencies
-
-- Flask
-- SQLite3
-- BeautifulSoup4
-- Requests
-- python-dotenv
-
-## Contributing
-
-Feel free to submit issues and enhancement requests! 
+## License
+MIT 
