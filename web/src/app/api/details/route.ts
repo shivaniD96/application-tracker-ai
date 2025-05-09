@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const flaskUrl = 'http://127.0.0.1:5000/api/details';
+  const flaskUrl = 'http://127.0.0.1:8080/api/details';
   const formData = await req.formData();
   const fetchRes = await fetch(flaskUrl, {
     method: 'POST',

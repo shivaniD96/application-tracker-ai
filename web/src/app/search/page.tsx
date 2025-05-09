@@ -24,6 +24,35 @@ interface Job {
   suggestions?: Suggestion[];
 }
 
+const COMMON_LOCATIONS = [
+  // North America
+  'United States', 'Canada', 'Mexico',
+  
+  // Europe
+  'United Kingdom', 'Germany', 'France', 'Netherlands', 'Spain', 'Italy',
+  'Switzerland', 'Sweden', 'Denmark', 'Norway', 'Finland', 'Ireland',
+  'Belgium', 'Austria', 'Poland', 'Portugal', 'Greece', 'Czech Republic',
+  
+  // Asia
+  'India', 'China', 'Japan', 'South Korea', 'Singapore', 'Hong Kong',
+  'Malaysia', 'Thailand', 'Vietnam', 'Indonesia', 'Philippines',
+  
+  // Middle East
+  'UAE', 'Saudi Arabia', 'Qatar', 'Kuwait', 'Bahrain', 'Oman',
+  
+  // Africa
+  'South Africa', 'Egypt', 'Nigeria', 'Kenya', 'Morocco',
+  
+  // South America
+  'Brazil', 'Argentina', 'Chile', 'Colombia', 'Peru',
+  
+  // Oceania
+  'Australia', 'New Zealand',
+  
+  // Remote Options
+  'Remote', 'Work from Home', 'Anywhere'
+];
+
 export default function SearchPage() {
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('');
@@ -107,22 +136,60 @@ export default function SearchPage() {
                   </div>
                 </div>
                 <div className="col-md-3">
-                  <input
-                    name="location"
-                    placeholder="Location"
-                    value={location}
-                    onChange={e => setLocation(e.target.value)}
-                    className="form-control form-control-lg"
-                  />
+                  <div className="input-group">
+                    <span className="input-group-text bg-primary text-white">
+                      <i className="bi bi-geo-alt"></i>
+                    </span>
+                    <select
+                      name="location"
+                      value={location}
+                      onChange={e => setLocation(e.target.value)}
+                      className="form-select form-select-lg"
+                    >
+                      <option value="">Select Location</option>
+                      {COMMON_LOCATIONS.map((loc) => (
+                        <option key={loc} value={loc}>
+                          {loc}
+                        </option>
+                      ))}
+                    </select>
+                    {location && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => setLocation('')}
+                      >
+                        <i className="bi bi-x"></i>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="col-md-3">
-                  <input
-                    name="platform"
-                    placeholder="Platform"
-                    value={platform}
-                    onChange={e => setPlatform(e.target.value)}
-                    className="form-control form-control-lg"
-                  />
+                  <div className="input-group">
+                    <span className="input-group-text bg-primary text-white">
+                      <i className="bi bi-globe"></i>
+                    </span>
+                    <select
+                      name="platform"
+                      value={platform}
+                      onChange={e => setPlatform(e.target.value)}
+                      className="form-select form-select-lg"
+                    >
+                      <option value="">All Platforms</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Indeed">Indeed</option>
+                      <option value="ZipRecruiter">ZipRecruiter</option>
+                    </select>
+                    {platform && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => setPlatform('')}
+                      >
+                        <i className="bi bi-x"></i>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="col-md-1">
                   <button className="btn btn-primary btn-lg w-100" type="submit" disabled={loading}>
@@ -170,6 +237,10 @@ export default function SearchPage() {
                     </div>
                   </div>
                   <h6 className="card-subtitle mb-2 text-muted">{job.company}</h6>
+                  <div className="d-flex align-items-center text-muted mb-2">
+                    <small className="me-3"><i className="bi bi-geo-alt"></i> {job.location}</small>
+                    <small><i className="bi bi-globe"></i> {job.platform}</small>
+                  </div>
                   {actionMsg[job.id] && <div className="alert alert-info mt-2 py-1 px-2">{actionMsg[job.id]}</div>}
                 </div>
               </div>

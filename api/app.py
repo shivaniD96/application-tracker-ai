@@ -93,36 +93,81 @@ def get_location_options():
 def fetch_linkedin_jobs(keyword, location):
     try:
         headers = {
-            'User-Agent': get_random_user_agent(),
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'DNT': '1'
         }
         
-        search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location={quote_plus(location)}"
-        print(f"Fetching LinkedIn jobs from: {search_url}")
-        response = requests.get(search_url, headers=headers, timeout=10)
+        # Handle remote locations
+        if location.lower() in ['remote', 'work from home', 'anywhere']:
+            search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location=Worldwide&f_WT=2"
+        else:
+            search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location={quote_plus(location)}"
+        
+        print(f"\nFetching LinkedIn jobs from: {search_url}")
+        session = requests.Session()
+        
+        # First make a GET request to the main page
+        try:
+            response = session.get('https://www.linkedin.com', headers=headers, timeout=10)
+            response.raise_for_status()
+            time.sleep(random.uniform(2, 4))  # Wait before the next request
+        except Exception as e:
+            print(f"Warning: Could not access LinkedIn main page: {str(e)}")
+        
+        # Now fetch the search results
+        response = session.get(search_url, headers=headers, timeout=10)
         response.raise_for_status()
+        
+        print(f"LinkedIn response status code: {response.status_code}")
+        print(f"LinkedIn response content type: {response.headers.get('content-type', 'unknown')}")
+        print(f"LinkedIn response length: {len(response.text)}")
         
         soup = BeautifulSoup(response.text, 'html.parser')
         jobs = []
         
-        for job_card in soup.select('.jobs-search__results-list li'):
+        # Try different selectors for job cards
+        job_cards = soup.select('.jobs-search__results-list li') or soup.select('.job-card-container')
+        print(f"Found {len(job_cards)} LinkedIn job cards")
+        
+        for job_card in job_cards:
             try:
-                title_elem = job_card.select_one('.base-search-card__title')
-                company_elem = job_card.select_one('.base-search-card__subtitle')
-                location_elem = job_card.select_one('.job-search-card__location')
-                link_elem = job_card.select_one('a.base-card__full-link')
+                # Try different selectors for each element
+                title_elem = (
+                    job_card.select_one('.base-search-card__title') or 
+                    job_card.select_one('.job-card-list__title') or
+                    job_card.select_one('.job-search-card__title')
+                )
+                company_elem = (
+                    job_card.select_one('.base-search-card__subtitle') or 
+                    job_card.select_one('.job-card-container__company-name') or
+                    job_card.select_one('.job-search-card__company-name')
+                )
+                location_elem = (
+                    job_card.select_one('.job-search-card__location') or 
+                    job_card.select_one('.job-card-container__metadata-item') or
+                    job_card.select_one('.job-search-card__location')
+                )
+                link_elem = (
+                    job_card.select_one('a.base-card__full-link') or 
+                    job_card.select_one('a.job-card-container__link') or
+                    job_card.select_one('a.job-search-card__link')
+                )
                 
                 if not all([title_elem, company_elem, location_elem, link_elem]):
                     continue
                 
                 job_location = location_elem.text.strip()
-                # Standardize location format
-                if 'India' in job_location:
-                    job_location = 'India'
-                elif 'UAE' in job_location or 'Dubai' in job_location:
-                    job_location = 'UAE'
-                
                 job = {
                     'title': title_elem.text.strip(),
                     'company': company_elem.text.strip(),
@@ -141,10 +186,12 @@ def fetch_linkedin_jobs(keyword, location):
                 }
                 
                 jobs.append(job)
+                print(f"Added LinkedIn job: {job['title']} at {job['company']}")
             except Exception as e:
                 print(f"Error parsing LinkedIn job card: {str(e)}")
                 continue
         
+        print(f"Found {len(jobs)} LinkedIn jobs")
         return jobs
     except Exception as e:
         print(f"Error fetching LinkedIn jobs: {str(e)}")
@@ -154,25 +201,76 @@ def fetch_linkedin_jobs(keyword, location):
 def fetch_indeed_jobs(keyword, location):
     try:
         headers = {
-            'User-Agent': get_random_user_agent(),
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'DNT': '1'
         }
         
-        search_url = f"https://www.indeed.com/jobs?q={quote_plus(keyword)}&l={quote_plus(location)}"
-        print(f"Fetching Indeed jobs from: {search_url}")
-        response = requests.get(search_url, headers=headers, timeout=10)
+        # Handle remote locations
+        if location.lower() in ['remote', 'work from home', 'anywhere']:
+            search_url = f"https://www.indeed.com/jobs?q={quote_plus(keyword)}&sc=0kf%3Aattr(FSFW)%3B"
+        else:
+            search_url = f"https://www.indeed.com/jobs?q={quote_plus(keyword)}&l={quote_plus(location)}"
+        
+        print(f"\nFetching Indeed jobs from: {search_url}")
+        session = requests.Session()
+        
+        # First make a GET request to the main page
+        try:
+            response = session.get('https://www.indeed.com', headers=headers, timeout=10)
+            response.raise_for_status()
+            time.sleep(random.uniform(2, 4))  # Wait before the next request
+        except Exception as e:
+            print(f"Warning: Could not access Indeed main page: {str(e)}")
+        
+        # Now fetch the search results
+        response = session.get(search_url, headers=headers, timeout=10)
         response.raise_for_status()
+        
+        print(f"Indeed response status code: {response.status_code}")
+        print(f"Indeed response content type: {response.headers.get('content-type', 'unknown')}")
+        print(f"Indeed response length: {len(response.text)}")
         
         soup = BeautifulSoup(response.text, 'html.parser')
         jobs = []
         
-        for job_card in soup.select('.job_seen_beacon'):
+        # Try different selectors for job cards
+        job_cards = soup.select('.job_seen_beacon') or soup.select('.jobsearch-ResultsList > div')
+        print(f"Found {len(job_cards)} Indeed job cards")
+        
+        for job_card in job_cards:
             try:
-                title_elem = job_card.select_one('.jobTitle')
-                company_elem = job_card.select_one('.companyName')
-                location_elem = job_card.select_one('.companyLocation')
-                link_elem = job_card.select_one('a.jcs-JobTitle')
+                # Try different selectors for each element
+                title_elem = (
+                    job_card.select_one('.jobTitle') or 
+                    job_card.select_one('.jcs-JobTitle') or
+                    job_card.select_one('.jobsearch-JobComponent-title')
+                )
+                company_elem = (
+                    job_card.select_one('.companyName') or 
+                    job_card.select_one('.companyLocation') or
+                    job_card.select_one('.jobsearch-CompanyInfoContainer')
+                )
+                location_elem = (
+                    job_card.select_one('.companyLocation') or 
+                    job_card.select_one('.jobsearch-CompanyLocation') or
+                    job_card.select_one('.jobsearch-CompanyInfoContainer')
+                )
+                link_elem = (
+                    job_card.select_one('a.jcs-JobTitle') or 
+                    job_card.select_one('a.jobLink') or
+                    job_card.select_one('a.jobsearch-JobComponent-title')
+                )
                 
                 if not all([title_elem, company_elem, location_elem, link_elem]):
                     continue
@@ -195,10 +293,12 @@ def fetch_indeed_jobs(keyword, location):
                 }
                 
                 jobs.append(job)
+                print(f"Added Indeed job: {job['title']} at {job['company']}")
             except Exception as e:
                 print(f"Error parsing Indeed job card: {str(e)}")
                 continue
-                
+        
+        print(f"Found {len(jobs)} Indeed jobs")
         return jobs
     except Exception as e:
         print(f"Error fetching Indeed jobs: {str(e)}")
@@ -208,25 +308,76 @@ def fetch_indeed_jobs(keyword, location):
 def fetch_ziprecruiter_jobs(keyword, location):
     try:
         headers = {
-            'User-Agent': get_random_user_agent(),
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'DNT': '1'
         }
         
-        search_url = f"https://www.ziprecruiter.com/jobs-search?search={quote_plus(keyword)}&location={quote_plus(location)}"
-        print(f"Fetching ZipRecruiter jobs from: {search_url}")
-        response = requests.get(search_url, headers=headers, timeout=10)
+        # Handle remote locations
+        if location.lower() in ['remote', 'work from home', 'anywhere']:
+            search_url = f"https://www.ziprecruiter.com/jobs-search?search={quote_plus(keyword)}&location=Remote"
+        else:
+            search_url = f"https://www.ziprecruiter.com/jobs-search?search={quote_plus(keyword)}&location={quote_plus(location)}"
+        
+        print(f"\nFetching ZipRecruiter jobs from: {search_url}")
+        session = requests.Session()
+        
+        # First make a GET request to the main page
+        try:
+            response = session.get('https://www.ziprecruiter.com', headers=headers, timeout=10)
+            response.raise_for_status()
+            time.sleep(random.uniform(2, 4))  # Wait before the next request
+        except Exception as e:
+            print(f"Warning: Could not access ZipRecruiter main page: {str(e)}")
+        
+        # Now fetch the search results
+        response = session.get(search_url, headers=headers, timeout=10)
         response.raise_for_status()
+        
+        print(f"ZipRecruiter response status code: {response.status_code}")
+        print(f"ZipRecruiter response content type: {response.headers.get('content-type', 'unknown')}")
+        print(f"ZipRecruiter response length: {len(response.text)}")
         
         soup = BeautifulSoup(response.text, 'html.parser')
         jobs = []
         
-        for job_card in soup.select('.job_content'):
+        # Try different selectors for job cards
+        job_cards = soup.select('.job_content') or soup.select('.job-listing')
+        print(f"Found {len(job_cards)} ZipRecruiter job cards")
+        
+        for job_card in job_cards:
             try:
-                title_elem = job_card.select_one('.job_title')
-                company_elem = job_card.select_one('.company_name')
-                location_elem = job_card.select_one('.location')
-                link_elem = job_card.select_one('a.job_link')
+                # Try different selectors for each element
+                title_elem = (
+                    job_card.select_one('.job_title') or 
+                    job_card.select_one('.job-title') or
+                    job_card.select_one('.job-listing-title')
+                )
+                company_elem = (
+                    job_card.select_one('.company_name') or 
+                    job_card.select_one('.company-name') or
+                    job_card.select_one('.job-listing-company')
+                )
+                location_elem = (
+                    job_card.select_one('.location') or 
+                    job_card.select_one('.job-location') or
+                    job_card.select_one('.job-listing-location')
+                )
+                link_elem = (
+                    job_card.select_one('a.job_link') or 
+                    job_card.select_one('a.job-link') or
+                    job_card.select_one('a.job-listing-link')
+                )
                 
                 if not all([title_elem, company_elem, location_elem, link_elem]):
                     continue
@@ -249,489 +400,27 @@ def fetch_ziprecruiter_jobs(keyword, location):
                 }
                 
                 jobs.append(job)
+                print(f"Added ZipRecruiter job: {job['title']} at {job['company']}")
             except Exception as e:
                 print(f"Error parsing ZipRecruiter job card: {str(e)}")
                 continue
-                
+        
+        print(f"Found {len(jobs)} ZipRecruiter jobs")
         return jobs
     except Exception as e:
         print(f"Error fetching ZipRecruiter jobs: {str(e)}")
         return []
 
-@rate_limit
-def fetch_linkedin_job_details(url):
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'DNT': '1'
-        }
-        
-        print(f"\nFetching LinkedIn job details from: {url}")
-        session = requests.Session()
-        
-        # First make a GET request to the main page
-        try:
-            response = session.get('https://www.linkedin.com', headers=headers, timeout=10)
-            response.raise_for_status()
-            time.sleep(random.uniform(2, 4))  # Wait before the next request
-        except Exception as e:
-            print(f"Warning: Could not access LinkedIn main page: {str(e)}")
-        
-        # Now fetch the job details
-        response = session.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        print(f"Response status code: {response.status_code}")
-        print(f"Response content type: {response.headers.get('content-type', 'unknown')}")
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Debug: Print the first 500 characters of the response
-        print("\nFirst 500 characters of response:")
-        print(response.text[:500])
-        
-        # Try to find the job description
-        description = None
-        description_text = ""
-        
-        # Try multiple approaches to find the description
-        selectors = [
-            'div.description__text',
-            'div.job-description',
-            'div.show-more-less-html__markup',
-            '#job-details',
-            'div.job-view-layout',
-            'div.job-description-container',
-            'div.job-description__content'
-        ]
-        
-        for selector in selectors:
-            print(f"\nTrying selector: {selector}")
-            description = soup.select_one(selector)
-            if description:
-                print(f"Found description with selector: {selector}")
-                break
-        
-        if description:
-            # Remove unwanted elements
-            for element in description.find_all(['script', 'style', 'button', 'a', 'div.job-description__footer']):
-                element.decompose()
-            
-            # Get the text content
-            description_text = description.get_text(separator='\n', strip=True)
-            
-            # Clean up the text
-            lines = [line.strip() for line in description_text.split('\n') if line.strip()]
-            description_text = '\n'.join(lines)
-            
-            # Remove common unwanted text
-            unwanted = ['See more', 'See less', 'Show more', 'Show less', 'Apply now', 'Apply for this job']
-            for text in unwanted:
-                description_text = description_text.replace(text, '')
-            
-            print(f"\nFound description with length: {len(description_text)}")
-            print("First 200 characters of description:")
-            print(description_text[:200])
-        else:
-            print("\nNo description found with any selector")
-            # Try to find any text content that might be a description
-            main_content = soup.find('main') or soup.find('div', {'role': 'main'})
-            if main_content:
-                print("\nTrying to extract description from main content")
-                description_text = main_content.get_text(separator='\n', strip=True)
-                lines = [line.strip() for line in description_text.split('\n') if line.strip()]
-                description_text = '\n'.join(lines)
-                print(f"Extracted text with length: {len(description_text)}")
-        
-        # Try to find requirements
-        requirements = []
-        
-        # Try multiple approaches to find requirements
-        req_selectors = [
-            'div.description__job-criteria',
-            'div.job-criteria',
-            'div.job-requirements',
-            'ul.job-requirements-list',
-            'div.job-requirements-container',
-            'div.job-criteria-container'
-        ]
-        
-        for selector in req_selectors:
-            print(f"\nTrying requirements selector: {selector}")
-            req_section = soup.select_one(selector)
-            if req_section:
-                req_items = req_section.find_all('li')
-                requirements = [item.get_text(strip=True) for item in req_items if item.get_text(strip=True)]
-                if requirements:
-                    print(f"Found {len(requirements)} requirements with selector: {selector}")
-                    break
-        
-        # If no requirements found, try to extract from description
-        if not requirements and description:
-            print("\nTrying to extract requirements from description")
-            # Look for bullet points
-            bullets = description.find_all(['ul', 'ol'])
-            for bullet_list in bullets:
-                items = bullet_list.find_all('li')
-                requirements.extend([item.get_text(strip=True) for item in items if item.get_text(strip=True)])
-            if requirements:
-                print(f"Found {len(requirements)} requirements from description bullets")
-        
-        print(f"\nTotal requirements found: {len(requirements)}")
-        
-        return {
-            'description': description_text,
-            'requirements': requirements,
-            'benefits': [],
-            'salary_range': ''
-        }
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 429:
-            print("\nRate limited by LinkedIn. Waiting longer before next request...")
-            time.sleep(random.uniform(30, 60))  # Wait 30-60 seconds before next request
-        print(f"\nError fetching LinkedIn job details: {str(e)}")
-        return {
-            'description': '',
-            'requirements': [],
-            'benefits': [],
-            'salary_range': ''
-        }
-    except Exception as e:
-        print(f"\nError fetching LinkedIn job details: {str(e)}")
-        return {
-            'description': '',
-            'requirements': [],
-            'benefits': [],
-            'salary_range': ''
-        }
-
-@rate_limit
-def fetch_indeed_job_details(url):
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'DNT': '1'
-        }
-        
-        print(f"\nFetching Indeed job details from: {url}")
-        session = requests.Session()
-        
-        # First make a GET request to the main page
-        try:
-            response = session.get('https://www.indeed.com', headers=headers, timeout=10)
-            response.raise_for_status()
-            time.sleep(random.uniform(2, 4))  # Wait before the next request
-        except Exception as e:
-            print(f"Warning: Could not access Indeed main page: {str(e)}")
-        
-        # Now fetch the job details
-        response = session.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        print(f"Response status code: {response.status_code}")
-        print(f"Response content type: {response.headers.get('content-type', 'unknown')}")
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Debug: Print the first 500 characters of the response
-        print("\nFirst 500 characters of response:")
-        print(response.text[:500])
-        
-        # Try to find the job description
-        description = None
-        description_text = ""
-        
-        # Try multiple approaches to find the description
-        selectors = [
-            '#jobDescriptionText',
-            '.jobsearch-jobDescriptionText',
-            '.job-description',
-            '#jobDescription',
-            '.jobsearch-jobDescription',
-            '.jobsearch-jobDescriptionText',
-            'div[data-testid="jobDescriptionText"]'
-        ]
-        
-        for selector in selectors:
-            print(f"\nTrying selector: {selector}")
-            description = soup.select_one(selector)
-            if description:
-                print(f"Found description with selector: {selector}")
-                break
-        
-        if description:
-            # Remove unwanted elements
-            for element in description.find_all(['script', 'style', 'button', 'a']):
-                element.decompose()
-            
-            # Get the text content
-            description_text = description.get_text(separator='\n', strip=True)
-            
-            # Clean up the text
-            lines = [line.strip() for line in description_text.split('\n') if line.strip()]
-            description_text = '\n'.join(lines)
-            
-            # Remove common unwanted text
-            unwanted = ['See more', 'See less', 'Show more', 'Show less', 'Apply now', 'Apply for this job']
-            for text in unwanted:
-                description_text = description_text.replace(text, '')
-            
-            print(f"\nFound description with length: {len(description_text)}")
-            print("First 200 characters of description:")
-            print(description_text[:200])
-        else:
-            print("\nNo description found with any selector")
-            # Try to find any text content that might be a description
-            main_content = soup.find('main') or soup.find('div', {'role': 'main'})
-            if main_content:
-                print("\nTrying to extract description from main content")
-                description_text = main_content.get_text(separator='\n', strip=True)
-                lines = [line.strip() for line in description_text.split('\n') if line.strip()]
-                description_text = '\n'.join(lines)
-                print(f"Extracted text with length: {len(description_text)}")
-        
-        # Try to find requirements
-        requirements = []
-        
-        # Try multiple approaches to find requirements
-        req_selectors = [
-            '.jobsearch-ReqAndQualSection',
-            '.job-requirements',
-            '.job-requirements-list',
-            '.jobsearch-jobDescriptionText ul li',
-            '.jobsearch-jobDescriptionText ol li',
-            'div[data-testid="jobDescriptionText"] ul li'
-        ]
-        
-        for selector in req_selectors:
-            print(f"\nTrying requirements selector: {selector}")
-            req_items = soup.select(selector)
-            if req_items:
-                requirements = [item.get_text(strip=True) for item in req_items if item.get_text(strip=True)]
-                if requirements:
-                    print(f"Found {len(requirements)} requirements with selector: {selector}")
-                    break
-        
-        # If no requirements found, try to extract from description
-        if not requirements and description:
-            print("\nTrying to extract requirements from description")
-            # Look for bullet points
-            bullets = description.find_all(['ul', 'ol'])
-            for bullet_list in bullets:
-                items = bullet_list.find_all('li')
-                requirements.extend([item.get_text(strip=True) for item in items if item.get_text(strip=True)])
-            if requirements:
-                print(f"Found {len(requirements)} requirements from description bullets")
-        
-        print(f"\nTotal requirements found: {len(requirements)}")
-        
-        return {
-            'description': description_text,
-            'requirements': requirements,
-            'benefits': [],
-            'salary_range': ''
-        }
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 429:
-            print("\nRate limited by Indeed. Waiting longer before next request...")
-            time.sleep(random.uniform(30, 60))  # Wait 30-60 seconds before next request
-        print(f"\nError fetching Indeed job details: {str(e)}")
-        return {
-            'description': '',
-            'requirements': [],
-            'benefits': [],
-            'salary_range': ''
-        }
-    except Exception as e:
-        print(f"\nError fetching Indeed job details: {str(e)}")
-        return {
-            'description': '',
-            'requirements': [],
-            'benefits': [],
-            'salary_range': ''
-        }
-
-@rate_limit
-def fetch_ziprecruiter_job_details(url):
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'DNT': '1'
-        }
-        
-        print(f"\nFetching ZipRecruiter job details from: {url}")
-        session = requests.Session()
-        
-        # First make a GET request to the main page
-        try:
-            response = session.get('https://www.ziprecruiter.com', headers=headers, timeout=10)
-            response.raise_for_status()
-            time.sleep(random.uniform(2, 4))  # Wait before the next request
-        except Exception as e:
-            print(f"Warning: Could not access ZipRecruiter main page: {str(e)}")
-        
-        # Now fetch the job details
-        response = session.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        print(f"Response status code: {response.status_code}")
-        print(f"Response content type: {response.headers.get('content-type', 'unknown')}")
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Debug: Print the first 500 characters of the response
-        print("\nFirst 500 characters of response:")
-        print(response.text[:500])
-        
-        # Try to find the job description
-        description = None
-        description_text = ""
-        
-        # Try multiple approaches to find the description
-        selectors = [
-            '.job_description',
-            '.job-description',
-            '.job-details',
-            '#job-description',
-            '.job-description-content',
-            '.job-description-text',
-            'div[data-testid="jobDescription"]'
-        ]
-        
-        for selector in selectors:
-            print(f"\nTrying selector: {selector}")
-            description = soup.select_one(selector)
-            if description:
-                print(f"Found description with selector: {selector}")
-                break
-        
-        if description:
-            # Remove unwanted elements
-            for element in description.find_all(['script', 'style', 'button', 'a']):
-                element.decompose()
-            
-            # Get the text content
-            description_text = description.get_text(separator='\n', strip=True)
-            
-            # Clean up the text
-            lines = [line.strip() for line in description_text.split('\n') if line.strip()]
-            description_text = '\n'.join(lines)
-            
-            # Remove common unwanted text
-            unwanted = ['See more', 'See less', 'Show more', 'Show less', 'Apply now', 'Apply for this job']
-            for text in unwanted:
-                description_text = description_text.replace(text, '')
-            
-            print(f"\nFound description with length: {len(description_text)}")
-            print("First 200 characters of description:")
-            print(description_text[:200])
-        else:
-            print("\nNo description found with any selector")
-            # Try to find any text content that might be a description
-            main_content = soup.find('main') or soup.find('div', {'role': 'main'})
-            if main_content:
-                print("\nTrying to extract description from main content")
-                description_text = main_content.get_text(separator='\n', strip=True)
-                lines = [line.strip() for line in description_text.split('\n') if line.strip()]
-                description_text = '\n'.join(lines)
-                print(f"Extracted text with length: {len(description_text)}")
-        
-        # Try to find requirements
-        requirements = []
-        
-        # Try multiple approaches to find requirements
-        req_selectors = [
-            '.job_requirements li',
-            '.job-requirements li',
-            '.requirements-list li',
-            '.job-description ul li',
-            '.job-description ol li',
-            'div[data-testid="jobDescription"] ul li'
-        ]
-        
-        for selector in req_selectors:
-            print(f"\nTrying requirements selector: {selector}")
-            req_items = soup.select(selector)
-            if req_items:
-                requirements = [item.get_text(strip=True) for item in req_items if item.get_text(strip=True)]
-                if requirements:
-                    print(f"Found {len(requirements)} requirements with selector: {selector}")
-                    break
-        
-        # If no requirements found, try to extract from description
-        if not requirements and description:
-            print("\nTrying to extract requirements from description")
-            # Look for bullet points
-            bullets = description.find_all(['ul', 'ol'])
-            for bullet_list in bullets:
-                items = bullet_list.find_all('li')
-                requirements.extend([item.get_text(strip=True) for item in items if item.get_text(strip=True)])
-            if requirements:
-                print(f"Found {len(requirements)} requirements from description bullets")
-        
-        print(f"\nTotal requirements found: {len(requirements)}")
-        
-        return {
-            'description': description_text,
-            'requirements': requirements,
-            'benefits': [],
-            'salary_range': ''
-        }
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 429:
-            print("\nRate limited by ZipRecruiter. Waiting longer before next request...")
-            time.sleep(random.uniform(30, 60))  # Wait 30-60 seconds before next request
-        print(f"\nError fetching ZipRecruiter job details: {str(e)}")
-        return {
-            'description': '',
-            'requirements': [],
-            'benefits': [],
-            'salary_range': ''
-        }
-    except Exception as e:
-        print(f"\nError fetching ZipRecruiter job details: {str(e)}")
-        return {
-            'description': '',
-            'requirements': [],
-            'benefits': [],
-            'salary_range': ''
-        }
-
 def fetch_all_jobs(keyword, location):
+    print(f"\nFetching jobs for keyword: {keyword}, location: {location}")
     jobs = []
+    
+    # Clear existing jobs from database for this search
+    conn = get_conn()
+    conn.execute('DELETE FROM jobs')
+    conn.commit()
+    conn.close()
+    
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
             executor.submit(fetch_linkedin_jobs, keyword, location),
@@ -741,7 +430,9 @@ def fetch_all_jobs(keyword, location):
         
         for future in futures:
             try:
-                jobs.extend(future.result())
+                platform_jobs = future.result()
+                if platform_jobs:  # Only extend if we got jobs
+                    jobs.extend(platform_jobs)
             except Exception as e:
                 print(f"Error in job fetch: {str(e)}")
     
@@ -753,41 +444,117 @@ def fetch_all_jobs(keyword, location):
             seen_urls.add(job['url'])
             unique_jobs.append(job)
     
+    print(f"Total unique jobs found: {len(unique_jobs)}")
+    # Print first few jobs for debugging
+    for i, job in enumerate(unique_jobs[:3]):
+        print(f"Job {i+1}: {job['title']} at {job['company']} in {job['location']}")
+    
+    # Save the jobs to the database
+    if unique_jobs:
+        save_listings(unique_jobs)
+    
     return unique_jobs
 
 def fetch_job_details(url):
+    """Fetch detailed job information from the job posting URL."""
     try:
-        # Determine which platform the URL belongs to
-        if 'linkedin.com' in url:
-            return fetch_linkedin_job_details(url)
-        elif 'indeed.com' in url:
-            return fetch_indeed_job_details(url)
-        elif 'ziprecruiter.com' in url:
-            return fetch_ziprecruiter_job_details(url)
-        else:
-            return {
-                'description': '',
-                'requirements': [],
-                'benefits': [],
-                'salary_range': ''
-            }
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        
+        session = requests.Session()
+        response = session.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Extract job description
+        description = ''
+        description_elem = (
+            soup.select_one('.job-description') or 
+            soup.select_one('.description__text') or
+            soup.select_one('.job-description__content') or
+            soup.select_one('.show-more-less-html__markup')
+        )
+        if description_elem:
+            description = description_elem.get_text(strip=True)
+        
+        # Extract requirements
+        requirements = []
+        requirements_elem = (
+            soup.select_one('.job-criteria-list') or
+            soup.select_one('.job-criteria') or
+            soup.select_one('.job-requirements')
+        )
+        if requirements_elem:
+            requirements = [req.strip() for req in requirements_elem.get_text().split('\n') if req.strip()]
+        
+        # Extract benefits
+        benefits = []
+        benefits_elem = (
+            soup.select_one('.job-benefits') or
+            soup.select_one('.benefits') or
+            soup.select_one('.job-perks')
+        )
+        if benefits_elem:
+            benefits = [benefit.strip() for benefit in benefits_elem.get_text().split('\n') if benefit.strip()]
+        
+        # Extract salary information
+        salary_info = ''
+        salary_elem = (
+            soup.select_one('.salary') or
+            soup.select_one('.compensation') or
+            soup.select_one('.job-salary')
+        )
+        if salary_elem:
+            salary_info = salary_elem.get_text(strip=True)
+        
+        return {
+            'description': description,
+            'requirements': requirements,
+            'benefits': benefits,
+            'salary_info': salary_info
+        }
     except Exception as e:
         print(f"Error fetching job details: {str(e)}")
         return {
-            'description': '',
+            'description': 'Error fetching job details. Please try again later.',
             'requirements': [],
             'benefits': [],
-            'salary_range': ''
+            'salary_info': ''
         }
 
 # APP INIT
 print(f"=== Loading UPDATED app.py at {time.asctime()} ===")
 app = Flask(__name__)
-CORS(app)  # Allow all origins
+CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins for all routes
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['HOST'] = '0.0.0.0'  # Use IP instead of localhost
-app.config['PORT'] = 5000
+app.config['PORT'] = 8080  # Update port to match frontend
+
+# Add error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
+
+# Add before_request handler to ensure proper CORS
+@app.before_request
+def before_request():
+    if request.method == 'OPTIONS':
+        response = app.make_default_options_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept'
+        return response
 
 # DB UTILITIES
 def get_conn():
@@ -867,119 +634,114 @@ def apply_external(job_id):
     conn.commit(); conn.close()
     return redirect(row['url'])
 
-@app.route('/search', methods=['GET','POST'])
+@app.route('/api/search', methods=['GET', 'POST'])
 def search():
-    conn = get_conn()
+    print("\n=== Search Request ===")
+    print(f"Method: {request.method}")
+    print(f"Form data: {request.form}")
+    print(f"Args: {request.args}")
+    
+    keyword = request.args.get('keyword', '')
+    location = request.args.get('location', '')
+    platform = request.args.get('platform', '')
+    page = int(request.args.get('page', 1))
+    
+    print(f"Search parameters - Keyword: {keyword}, Location: {location}, Platform: {platform}")
+    
     try:
-        keyword = request.form.get('keyword','') if request.method=='POST' else request.args.get('keyword','')
-        location = request.form.get('location','') if request.method=='POST' else request.args.get('location','')
-        platform = request.form.get('platform','') if request.method=='POST' else request.args.get('platform','')
+        # Clear old jobs and fetch new ones
+        conn = get_conn()
+        conn.execute('DELETE FROM jobs')
+        conn.commit()
         
-        if request.method=='POST':
-            lst = fetch_all_jobs(keyword, location)
-            save_listings(lst)
-        
-        rows = conn.execute('SELECT * FROM jobs ORDER BY fetched_at DESC').fetchall()
-        resume = conn.execute('SELECT * FROM resume ORDER BY uploaded_at DESC LIMIT 1').fetchone()
-        
-        # Get application statuses for all jobs
-        application_statuses = conn.execute('''
-            SELECT job_id, status 
-            FROM applications 
-            WHERE job_id IN (SELECT id FROM jobs)
-        ''').fetchall()
-        
-        # Create a dictionary of job_id to application status
-        job_statuses = {row['job_id']: row['status'] for row in application_statuses}
-        
-        # Get unique locations and platforms for dropdowns
-        locations = sorted(set(get_location_options() + [row['location'] for row in rows]))
-        platforms = sorted(set(row['platform'] for row in rows))
-        
-        # Apply filters
-        filter_loc = request.args.get('filter_loc','')
-        filter_platform = request.args.get('filter_platform','')
-        sort_by = request.args.get('sort_by', 'recent')
-        application_status = request.args.get('application_status', '')
-        page = request.args.get('page',1,type=int)
-        
-        if filter_loc:
-            rows = [r for r in rows if filter_loc.lower() in r['location'].lower()]
-        if filter_platform:
-            rows = [r for r in rows if filter_platform.lower() == r['platform'].lower()]
-        
-        # Apply application status filter
-        if application_status == 'applied':
-            rows = [r for r in rows if r['id'] in job_statuses]
-        elif application_status == 'not_applied':
-            rows = [r for r in rows if r['id'] not in job_statuses]
-        
-        # Apply sorting
-        if sort_by == 'recent':
-            rows = sorted(rows, key=lambda x: x['date_posted'], reverse=True)
-        elif sort_by == 'oldest':
-            rows = sorted(rows, key=lambda x: x['date_posted'])
-        elif sort_by == 'a_to_z':
-            rows = sorted(rows, key=lambda x: x['title'].lower())
-        elif sort_by == 'z_to_a':
-            rows = sorted(rows, key=lambda x: x['title'].lower(), reverse=True)
-        elif sort_by == 'company_a_to_z':
-            rows = sorted(rows, key=lambda x: x['company'].lower())
-        elif sort_by == 'company_z_to_a':
-            rows = sorted(rows, key=lambda x: x['company'].lower(), reverse=True)
-        
-        total = len(rows)
-        pages = (total + PER_PAGE - 1) // PER_PAGE
-        page = max(1, min(page, pages))
-        rows = rows[(page-1)*PER_PAGE : page*PER_PAGE]
-        
-        # Convert requirements from JSON string to list and calculate match percentage
-        rows = [dict(r) for r in rows]
-        for row in rows:
+        # Fetch jobs based on platform selection
+        jobs = []
+        if platform:
+            if platform == 'LinkedIn':
+                jobs.extend(fetch_linkedin_jobs(keyword, location))
+            elif platform == 'Indeed':
+                jobs.extend(fetch_indeed_jobs(keyword, location))
+            elif platform == 'ZipRecruiter':
+                jobs.extend(fetch_ziprecruiter_jobs(keyword, location))
+        else:
+            # Fetch from all platforms if no specific platform is selected
+            jobs.extend(fetch_linkedin_jobs(keyword, location))
             try:
-                row['requirements'] = json.loads(row['requirements'])
-            except:
-                row['requirements'] = []
-            
-            # Add application status
-            row['application_status'] = job_statuses.get(row['id'])
-            
-            # Initialize default values
-            row['match_percentage'] = 0
-            row['matched_skills'] = {}
-            row['missing_skills'] = {}
-            row['suggestions'] = []
-            
-            # Only calculate match if we have both a resume and a complete job description
-            if resume and row['description'] and row['description'] != 'Click "Details" to view full description':
-                resume_path = os.path.join(app.config['UPLOAD_FOLDER'], resume['filename'])
-                resume_text = extract_text_from_file(resume_path)
-                resume_skills, resume_entities = extract_skills_from_text(resume_text)
-                
-                # Extract skills from job description
-                job_skills, job_entities = extract_skills_from_text(row['description'])
-                
-                # Calculate match percentage
-                match_percentage, matched_skills, missing_skills = calculate_job_match(
-                    row['description'],
-                    resume_skills
-                )
-                
-                row['match_percentage'] = round(match_percentage, 1)
-                row['matched_skills'] = matched_skills
-                row['missing_skills'] = missing_skills
-                row['suggestions'] = generate_improvement_suggestions(missing_skills, row['description'])
+                jobs.extend(fetch_indeed_jobs(keyword, location))
+            except Exception as e:
+                print(f"Error fetching Indeed jobs: {str(e)}")
+            try:
+                jobs.extend(fetch_ziprecruiter_jobs(keyword, location))
+            except Exception as e:
+                print(f"Error fetching ZipRecruiter jobs: {str(e)}")
         
-        return jsonify({
-            'jobs': rows,
-            'total': total,
-            'pages': pages,
+        # Save the jobs to database
+        if jobs:
+            save_listings(jobs)
+        
+        # Get all jobs from database
+        jobs = conn.execute('SELECT * FROM jobs ORDER BY fetched_at DESC').fetchall()
+        conn.close()
+        
+        # Filter jobs based on search criteria with more flexible matching
+        filtered_jobs = []
+        for job in jobs:
+            # More flexible keyword matching
+            keyword_match = (
+                not keyword or
+                keyword.lower() in job['title'].lower() or
+                keyword.lower() in job['company'].lower() or
+                keyword.lower() in job['description'].lower()
+            )
+            
+            # More flexible location matching
+            location_match = (
+                not location or
+                location.lower() in job['location'].lower() or
+                f"{location.lower()}," in job['location'].lower() or
+                f", {location.lower()}" in job['location'].lower()
+            )
+            
+            # Platform matching
+            platform_match = not platform or platform == job['platform']
+            
+            if keyword_match and location_match and platform_match:
+                filtered_jobs.append(dict(job))
+        
+        # Pagination
+        total_jobs = len(filtered_jobs)
+        jobs_per_page = 5
+        total_pages = (total_jobs + jobs_per_page - 1) // jobs_per_page
+        start_idx = (page - 1) * jobs_per_page
+        end_idx = start_idx + jobs_per_page
+        paginated_jobs = filtered_jobs[start_idx:end_idx]
+        
+        # Get unique locations and platforms for filters
+        locations = sorted(list(set(job['location'] for job in jobs)))
+        platforms = sorted(list(set(job['platform'] for job in jobs)))
+        
+        response_data = {
+            'jobs': paginated_jobs,
+            'total': total_jobs,
+            'pages': total_pages,
             'current_page': page,
             'locations': locations,
             'platforms': platforms
-        })
-    finally:
-        conn.close()
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"Error in search function: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'jobs': [],
+            'total': 0,
+            'pages': 0,
+            'current_page': page,
+            'locations': [],
+            'platforms': []
+        }), 500
 
 @app.route('/api/tracker', methods=['GET'])
 def tracker():
@@ -1092,188 +854,64 @@ def init_db_route():
     init_db()
     return jsonify({'status': 'success', 'message': 'Database initialized successfully!'})
 
-@app.route('/api/job_details/<int:job_id>')
+@app.route('/api/job_details/<int:job_id>', methods=['GET'])
 def job_details(job_id):
-    print(f"\nFetching job details for job_id: {job_id}")
-    conn = get_conn()
-    job = conn.execute('SELECT * FROM jobs WHERE id = ?', (job_id,)).fetchone()
-    resume = conn.execute('SELECT * FROM resume ORDER BY uploaded_at DESC LIMIT 1').fetchone()
-    conn.close()
-    
-    if not job:
-        print("Job not found")
-        return jsonify({"error": "Job not found"}), 404
-    
-    job = dict(job)
-    print(f"Found job: {job['title']}")
-    
-    # Only fetch details if they haven't been fetched before
-    if not job.get('description') or job['description'] == 'Click "Details" to view full description':
-        try:
-            details = fetch_job_details(job['url'])
-            job.update(details)
-            
-            # Update the database with the fetched details
-            conn = get_conn()
-            conn.execute('''
-                UPDATE jobs 
-                SET description = ?, requirements = ?
-                WHERE id = ?
-            ''', (
-                job['description'],
-                json.dumps(job['requirements']),
-                job_id
-            ))
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            print(f"Error fetching job details: {str(e)}")
-            return jsonify({"error": str(e)}), 500
-    
-    # Calculate job match if resume exists
-    if resume:
-        print(f"Found resume: {resume['filename']}")
-        resume_path = os.path.join(app.config['UPLOAD_FOLDER'], resume['filename'])
-        resume_text = extract_text_from_file(resume_path)
-        resume_skills, resume_entities = extract_skills_from_text(resume_text)
-        print(f"Extracted skills from resume: {resume_skills}")
+    """Get detailed information about a specific job."""
+    try:
+        conn = get_conn()
+        job = conn.execute('SELECT * FROM jobs WHERE id = ?', (job_id,)).fetchone()
+        if not job:
+            return jsonify({'error': 'Job not found'}), 404
+
+        job = dict(job)
         
+        # Only fetch details if they haven't been fetched before
+        if not job.get('description') or job['description'] == 'Click "Details" to view full description':
+            try:
+                details = fetch_job_details(job['url'])
+                job.update(details)
+                
+                # Update the database with the fetched details
+                conn.execute('''
+                    UPDATE jobs 
+                    SET description = ?, requirements = ?
+                    WHERE id = ?
+                ''', (
+                    job['description'],
+                    json.dumps(job.get('requirements', [])),
+                    job_id
+                ))
+                conn.commit()
+            except Exception as e:
+                print(f"Error fetching job details: {str(e)}")
+                return jsonify({"error": str(e)}), 500
+        
+        # Get resume skills
+        resume_skills = {}
+        resume = conn.execute('SELECT * FROM resume ORDER BY uploaded_at DESC LIMIT 1').fetchone()
+        if resume:
+            resume_path = os.path.join(app.config['UPLOAD_FOLDER'], resume['filename'])
+            if os.path.exists(resume_path):
+                resume_text = extract_text_from_file(resume_path)
+                resume_skills, _ = extract_skills_from_text(resume_text)
+        
+        # Calculate match percentage
         match_percentage, matched_skills, missing_skills = calculate_job_match(
-            job['description'],
-            resume_skills
+            job['description'], resume_skills
         )
-        print(f"Match percentage: {match_percentage}")
-        print(f"Matched skills: {matched_skills}")
-        print(f"Missing skills: {missing_skills}")
         
-        # Generate personalized suggestions
-        suggestions = []
-        
-        # 1. Skills Analysis
-        for category, skills in missing_skills.items():
-            if skills:
-                # Check if these skills are mentioned in the job description
-                relevant_skills = [skill for skill in skills if skill.lower() in job['description'].lower()]
-                if relevant_skills:
-                    suggestions.append({
-                        'category': f'Missing {category}',
-                        'suggestion': f"The job requires {', '.join(relevant_skills)} which are not found in your resume. These skills are specifically mentioned in the job description.",
-                        'action_items': [
-                            f"Add {skill} to your skills section" for skill in relevant_skills
-                        ]
-                    })
-        
-        # 2. Experience Analysis
-        experience_patterns = [
-            r'(\d+)\+\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
-            r'experience\s*(?:of)?\s*(\d+)\+\s*(?:years?|yrs?)'
-        ]
-        
-        for pattern in experience_patterns:
-            matches = re.finditer(pattern, job['description'].lower())
-            for match in matches:
-                years = match.group(1)
-                # Check if resume mentions any experience
-                if not re.search(r'\d+\s*(?:years?|yrs?)\s*(?:of)?\s*experience', resume_text.lower()):
-                    suggestions.append({
-                        'category': 'Experience Requirements',
-                        'suggestion': f"The job requires {years}+ years of experience. Your resume should clearly state your years of experience.",
-                        'action_items': [
-                            "Add specific years of experience in your work history",
-                            "Quantify your experience with concrete examples",
-                            "Highlight relevant projects and achievements"
-                        ]
-                    })
-        
-        # 3. Education Analysis
-        education_keywords = ['bachelor', 'master', 'phd', 'degree', 'diploma', 'certification']
-        job_education = [keyword for keyword in education_keywords if keyword in job['description'].lower()]
-        resume_education = [keyword for keyword in education_keywords if keyword in resume_text.lower()]
-        
-        missing_education = [edu for edu in job_education if edu not in resume_education]
-        if missing_education:
-            suggestions.append({
-                'category': 'Education Requirements',
-                'suggestion': f"The job requires {', '.join(missing_education)} qualifications. Make sure your education section is complete.",
-                'action_items': [
-                    "List your highest education degree first",
-                    "Include relevant certifications",
-                    "Highlight relevant coursework and achievements"
-                ]
-            })
-        
-        # 4. Soft Skills Analysis
-        soft_skills = ['communication', 'leadership', 'teamwork', 'problem-solving', 'time management', 'collaboration']
-        job_soft_skills = [skill for skill in soft_skills if skill in job['description'].lower()]
-        resume_soft_skills = [skill for skill in soft_skills if skill in resume_text.lower()]
-        
-        missing_soft_skills = [skill for skill in job_soft_skills if skill not in resume_soft_skills]
-        if missing_soft_skills:
-            suggestions.append({
-                'category': 'Soft Skills',
-                'suggestion': f"The job emphasizes {', '.join(missing_soft_skills)}. Add examples of these skills in your experience.",
-                'action_items': [
-                    f"Add specific examples of {skill} in your work experience" for skill in missing_soft_skills
-                ]
-            })
-        
-        # 5. Industry Experience Analysis
-        industry_keywords = ['industry', 'sector', 'domain', 'field']
-        job_industry = [keyword for keyword in industry_keywords if keyword in job['description'].lower()]
-        resume_industry = [keyword for keyword in industry_keywords if keyword in resume_text.lower()]
-        
-        if job_industry and not resume_industry:
-            suggestions.append({
-                'category': 'Industry Experience',
-                'suggestion': "The job requires specific industry experience. Highlight your relevant industry background.",
-                'action_items': [
-                    "List relevant industry experience prominently",
-                    "Highlight industry-specific projects and achievements",
-                    "Mention industry certifications and training",
-                    "Include industry-specific tools and technologies you've used"
-                ]
-            })
-        
-        # 6. Technical Requirements Analysis
-        technical_requirements = re.findall(r'(?:required|must have|should have|experience with|proficient in|knowledge of)\s+([^.,]+)', job['description'].lower())
-        if technical_requirements:
-            missing_tech = []
-            for req in technical_requirements:
-                if req not in resume_text.lower():
-                    missing_tech.append(req)
-            if missing_tech:
-                suggestions.append({
-                    'category': 'Technical Requirements',
-                    'suggestion': f"The job specifically requires experience with {', '.join(missing_tech)}. Consider adding these to your resume.",
-                    'action_items': [
-                        f"Add experience with {tech} to your skills or experience section" for tech in missing_tech
-                    ]
-                })
-        
-        # 7. Project Experience Analysis
-        if 'project' in job['description'].lower() and 'project' not in resume_text.lower():
-            suggestions.append({
-                'category': 'Project Experience',
-                'suggestion': "The job emphasizes project experience. Make sure to highlight your relevant projects.",
-                'action_items': [
-                    "Add a dedicated projects section to your resume",
-                    "Include project details, technologies used, and outcomes",
-                    "Highlight your role and contributions in each project"
-                ]
-            })
-        
+        # Add match information to job details
         job['match_percentage'] = round(match_percentage, 1)
         job['matched_skills'] = matched_skills
         job['missing_skills'] = missing_skills
-        job['suggestions'] = suggestions
-        print(f"Total suggestions generated: {len(suggestions)}")
-    else:
-        job['match_percentage'] = None
-        job['matched_skills'] = {}
-        job['missing_skills'] = {}
-        job['suggestions'] = []
-    
-    return jsonify(job)
+        
+        conn.close()
+        return jsonify(job)
+    except Exception as e:
+        print(f"Error in job_details: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/update_application_status/<int:job_id>', methods=['POST'])
 def update_application_status(job_id):
@@ -1315,10 +953,6 @@ def update_application_status(job_id):
     finally:
         if conn:
             conn.close()
-
-@app.route('/api/search', methods=['GET','POST'])
-def api_search():
-    return search()
 
 @app.route('/api/save_job/<int:job_id>', methods=['POST', 'DELETE'])
 def save_job(job_id):
@@ -1390,12 +1024,14 @@ TECHNICAL_SKILLS = {
     'AI/ML': [
         'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'scikit-learn', 'keras', 'nlp',
         'computer vision', 'opencv', 'nltk', 'spacy', 'bert', 'gpt', 'transformer', 'reinforcement learning',
-        'neural networks', 'cnn', 'rnn', 'lstm', 'gan', 'svm', 'random forest', 'xgboost', 'lightgbm'
+        'neural networks', 'cnn', 'rnn', 'lstm', 'gan', 'svm', 'random forest', 'xgboost', 'lightgbm',
+        'ai', 'artificial intelligence', 'ai-powered', 'ai applications'
     ],
     'Data Science': [
         'pandas', 'numpy', 'matplotlib', 'seaborn', 'r', 'tableau', 'power bi', 'looker', 'qlik',
         'apache spark', 'hadoop', 'hive', 'pig', 'kafka', 'airflow', 'dbt', 'databricks', 'jupyter',
-        'data visualization', 'statistical analysis', 'a/b testing', 'experiment design'
+        'data visualization', 'statistical analysis', 'a/b testing', 'experiment design', 'kpi analysis',
+        'metrics tracking', 'data analytics'
     ],
     'Mobile Development': [
         'android', 'ios', 'react native', 'flutter', 'xamarin', 'swift', 'kotlin', 'objective-c',
@@ -1409,17 +1045,34 @@ TECHNICAL_SKILLS = {
     'Project Management': [
         'agile', 'scrum', 'kanban', 'jira', 'trello', 'asana', 'monday.com', 'project management',
         'product management', 'sprint planning', 'retrospectives', 'user stories', 'backlog grooming',
-        'risk management', 'stakeholder management'
+        'risk management', 'stakeholder management', 'product strategy', 'product development',
+        'product lifecycle', 'product roadmap', 'market analysis', 'competitive analysis',
+        'product requirements', 'mvp development', 'go-to-market strategy'
     ],
     'Soft Skills': [
         'leadership', 'communication', 'teamwork', 'problem-solving', 'time management', 'collaboration',
         'adaptability', 'critical thinking', 'creativity', 'emotional intelligence', 'conflict resolution',
-        'mentoring', 'presentation skills', 'negotiation', 'decision making', 'strategic thinking'
+        'mentoring', 'presentation skills', 'negotiation', 'decision making', 'strategic thinking',
+        'team working', 'organizational skills', 'analytical skills', 'english', 'multilingual'
+    ],
+    'Business Skills': [
+        'retail', 'e-commerce', 'sales', 'marketing', 'business development', 'customer service',
+        'market research', 'competitive analysis', 'strategic planning', 'business strategy',
+        'financial analysis', 'budgeting', 'forecasting', 'vendor management', 'client relations',
+        'stakeholder management', 'contract negotiation', 'business operations', 'supply chain',
+        'inventory management', 'retail operations', 'merchandising', 'brand management'
     ],
     'Methodologies': [
         'agile', 'scrum', 'kanban', 'waterfall', 'devops', 'ci/cd', 'tdd', 'bdd', 'pair programming',
         'code review', 'technical documentation', 'api design', 'microservices', 'domain-driven design',
-        'test-driven development', 'behavior-driven development'
+        'test-driven development', 'behavior-driven development', 'lean methodology', 'six sigma',
+        'design thinking', 'user-centered design'
+    ],
+    'Industry-Specific': [
+        'pos', 'point of sale', 'point-of-sale', 'pos systems', 'pos technology', 'pos products',
+        'hospitality', 'catering', 'food service', 'retail tech', 'digital screens', 'kitchen display',
+        'kiosks', 'user-facing systems', 'physical systems', 'digital applications', 'contract catering',
+        'hospitality industry', 'catering industry', 'food service industry', 'retail industry'
     ]
 }
 
@@ -1456,227 +1109,216 @@ def extract_skills_from_text(text):
     doc = nlp(text)
     entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ['ORG', 'PRODUCT']]
     
-    # Extract skills using keyword matching
-    found_skills = {}
-    for category, skills in TECHNICAL_SKILLS.items():
-        category_skills = []
-        for skill in skills:
-            if skill in text:
-                category_skills.append(skill)
-        if category_skills:
-            found_skills[category] = category_skills
+    # Initialize skills dictionary
+    found_skills = {
+        'requirements': set(),
+        'experience': set(),
+        'responsibilities': set()
+    }
     
-    return found_skills, entities
+    # Extract skills using context-based patterns
+    skill_patterns = {
+        'requirements': [
+            r'required (?:skills|experience|knowledge) (?:in|with|of) ([^.,]+)',
+            r'must have (?:experience|knowledge) (?:in|with|of) ([^.,]+)',
+            r'should have (?:experience|knowledge) (?:in|with|of) ([^.,]+)',
+            r'looking for (?:experience|knowledge) (?:in|with|of) ([^.,]+)',
+            r'seeking (?:experience|knowledge) (?:in|with|of) ([^.,]+)',
+            r'candidates should have (?:experience|knowledge) (?:in|with|of) ([^.,]+)'
+        ],
+        'experience': [
+            r'experience (?:with|in|of) ([^.,]+)',
+            r'familiar (?:with|in) ([^.,]+)',
+            r'knowledge (?:of|in) ([^.,]+)',
+            r'proficient (?:in|with) ([^.,]+)',
+            r'expertise (?:in|with) ([^.,]+)',
+            r'working (?:with|in) ([^.,]+)',
+            r'using ([^.,]+)',
+            r'([^.,]+) experience',
+            r'([^.,]+) knowledge',
+            r'([^.,]+) skills',
+            r'([^.,]+) development',
+            r'([^.,]+) programming',
+            r'([^.,]+) systems',
+            r'([^.,]+) products',
+            r'([^.,]+) applications',
+            r'([^.,]+) technology'
+        ],
+        'responsibilities': [
+            r'responsible for ([^.,]+)',
+            r'managing ([^.,]+)',
+            r'developing ([^.,]+)',
+            r'creating ([^.,]+)',
+            r'building ([^.,]+)',
+            r'designing ([^.,]+)',
+            r'implementing ([^.,]+)',
+            r'maintaining ([^.,]+)'
+        ]
+    }
+    
+    # Extract skills using patterns
+    for context, patterns in skill_patterns.items():
+        for pattern in patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                skill = match.group(1).strip()
+                # Clean up the skill text
+                skill = re.sub(r'\b(?:and|or|with|in|of)\b', '', skill).strip()
+                if len(skill) > 2:  # Avoid single words or very short phrases
+                    found_skills[context].add(skill)
+    
+    # Match extracted skills against known technical skills
+    matched_skills = {
+        'requirements': set(),
+        'experience': set(),
+        'responsibilities': set()
+    }
+    
+    for category, skills in TECHNICAL_SKILLS.items():
+        for skill in skills:
+            skill_lower = skill.lower()
+            for context in found_skills:
+                for extracted_skill in found_skills[context]:
+                    if (skill_lower in extracted_skill.lower() or 
+                        extracted_skill.lower() in skill_lower):
+                        matched_skills[context].add(skill)
+    
+    # Convert sets to lists
+    return {k: list(v) for k, v in matched_skills.items()}, entities
 
 def calculate_job_match(job_description, resume_skills):
     """Calculate job match percentage based on skills and requirements."""
-    # Convert job description to lowercase
-    job_desc = job_description.lower()
-    
     # Extract skills from job description
-    job_skills = {}
-    for category, skills in TECHNICAL_SKILLS.items():
-        category_skills = []
-        for skill in skills:
-            # Check for exact matches and variations
-            if skill in job_desc or f"{skill}s" in job_desc or f"{skill}ing" in job_desc:
-                category_skills.append(skill)
-        if category_skills:
-            job_skills[category] = category_skills
+    job_skills, _ = extract_skills_from_text(job_description)
     
-    # Calculate match score with weighted categories
-    category_weights = {
-        'Programming Languages': 1.5,
-        'Web Technologies': 1.3,
-        'Databases': 1.2,
-        'Cloud Platforms': 1.2,
-        'DevOps & Tools': 1.3,
-        'AI/ML': 1.4,
-        'Data Science': 1.3,
-        'Mobile Development': 1.2,
-        'Security': 1.2,
-        'Project Management': 1.1,
-        'Soft Skills': 1.0,
-        'Methodologies': 1.1
-    }
-    
-    total_weighted_skills = 0
-    total_matched_weighted_skills = 0
+    # Calculate match score
+    total_skills = 0
     matched_skills = {}
     missing_skills = {}
     
-    for category, skills in job_skills.items():
-        weight = category_weights.get(category, 1.0)
-        resume_category_skills = resume_skills.get(category, [])
-        
-        # Calculate weighted matches
-        matched = [skill for skill in skills if skill in resume_category_skills]
-        missing = [skill for skill in skills if skill not in resume_category_skills]
-        
-        total_weighted_skills += len(skills) * weight
-        total_matched_weighted_skills += len(matched) * weight
-        
-        if matched:
-            matched_skills[category] = matched
-        if missing:
-            missing_skills[category] = missing
-    
-    # Calculate final match percentage
-    if total_weighted_skills == 0:
-        return 0, {}, {}
-    
-    match_percentage = (total_matched_weighted_skills / total_weighted_skills) * 100
-    
-    # Add skill level analysis
-    skill_levels = {
-        'expert': ['expert', 'advanced', 'senior', 'lead', 'architect'],
-        'intermediate': ['intermediate', 'mid-level', 'experienced'],
-        'basic': ['basic', 'entry-level', 'junior', 'familiar']
+    # Weight different contexts differently
+    context_weights = {
+        'requirements': 1.5,  # Required skills are most important
+        'experience': 1.3,    # Experience is second most important
+        'responsibilities': 1.0  # Responsibilities are least important
     }
     
-    # Analyze required skill levels from job description
-    required_levels = {}
-    for level, keywords in skill_levels.items():
-        for keyword in keywords:
-            if keyword in job_desc:
-                required_levels[level] = True
+    for context, skills in job_skills.items():
+        weight = context_weights.get(context, 1.0)
+        total_skills += len(skills) * weight
+        
+        # Find matches in resume
+        matched = []
+        missing = []
+        
+        for skill in skills:
+            # Check for exact matches and partial matches
+            skill_matched = False
+            for resume_context, resume_skill_list in resume_skills.items():
+                for resume_skill in resume_skill_list:
+                    # Check for exact match or if one is contained in the other
+                    if (skill.lower() == resume_skill.lower() or
+                        skill.lower() in resume_skill.lower() or
+                        resume_skill.lower() in skill.lower()):
+                        matched.append(skill)
+                        skill_matched = True
+                        break
+                if skill_matched:
+                    break
+            
+            if not skill_matched:
+                missing.append(skill)
+        
+        if matched:
+            matched_skills[context] = {
+                'skills': matched,
+                'level': 'expert' if context == 'requirements' else 'intermediate' if context == 'experience' else 'basic'
+            }
+        
+        if missing:
+            missing_skills[context] = {
+                'skills': missing,
+                'level': 'expert' if context == 'requirements' else 'intermediate' if context == 'experience' else 'basic'
+            }
     
-    # Add level information to matched and missing skills
-    for category in matched_skills:
-        matched_skills[category] = {
-            'skills': matched_skills[category],
-            'level': 'expert' if 'expert' in required_levels else 'intermediate' if 'intermediate' in required_levels else 'basic'
-        }
+    # Calculate match percentage
+    if total_skills == 0:
+        return 0, {}, {}
     
-    for category in missing_skills:
-        missing_skills[category] = {
-            'skills': missing_skills[category],
-            'level': 'expert' if 'expert' in required_levels else 'intermediate' if 'intermediate' in required_levels else 'basic'
-        }
+    match_percentage = (sum(len(matched_skills.get(context, {}).get('skills', [])) * context_weights.get(context, 1.0)
+                        for context in job_skills.keys()) / total_skills) * 100
     
     return match_percentage, matched_skills, missing_skills
 
-def generate_improvement_suggestions(missing_skills, job_description):
-    """Generate AI-powered suggestions for improvement."""
+def generate_personalized_suggestions(job_requirements, resume_skills, resume_text):
+    """Generate personalized suggestions based on job requirements and resume content."""
     suggestions = []
     
-    # Analyze missing skills with context
-    for category, skill_info in missing_skills.items():
-        skills = skill_info['skills']
-        level = skill_info['level']
-        
-        if skills:
-            # Get context from job description
-            context = []
-            for skill in skills:
-                # Look for sentences containing the skill
-                sentences = re.findall(r'[^.]*' + re.escape(skill) + r'[^.]*\.', job_description.lower())
-                if sentences:
-                    context.extend(sentences)
+    # Extract skills from job description
+    job_skills, _ = extract_skills_from_text(job_requirements['context'].get('description', ''))
+    
+    # Process each context
+    for context, skills in job_skills.items():
+        # Filter skills that are not in resume
+        missing_skills = []
+        for skill in skills:
+            skill_found = False
+            for resume_context, resume_skill_list in resume_skills.items():
+                for resume_skill in resume_skill_list:
+                    if (skill.lower() == resume_skill.lower() or
+                        skill.lower() in resume_skill.lower() or
+                        resume_skill.lower() in skill.lower()):
+                        skill_found = True
+                        break
+                if skill_found:
+                    break
             
-            # Generate contextual suggestions
-            if context:
-                context_str = ' '.join(context)
-                action_items = [
-                    f"Add {skill} to your skills section with {level} level proficiency" for skill in skills
-                ]
-                action_items.extend([
-                    f"Highlight relevant projects or experience with {', '.join(skills)}",
-                    f"Consider taking advanced courses or certifications in {', '.join(skills)}"
-                ])
-                suggestions.append({
-                    'category': f'Missing {category} Skills',
-                    'suggestion': f"The job requires {level} level knowledge of {', '.join(skills)}. Based on the job description: {context_str}",
-                    'action_items': action_items
-                })
-            else:
-                # If no specific context found, provide general suggestions
-                suggestions.append({
-                    'category': f'Missing {category} Skills',
-                    'suggestion': f"The job requires {level} level knowledge of {', '.join(skills)}. These skills are important for this role.",
-                    'action_items': [
-                        f"Add {skill} to your skills section with {level} level proficiency" for skill in skills
-                    ]
-                })
+            if not skill_found:
+                missing_skills.append(skill)
+        
+        if missing_skills:
+            # Generate personalized suggestion
+            suggestion = {
+                'category': f'Missing {context.title()}',
+                'skills': missing_skills,
+                'confidence': 1.0,
+                'context': context,
+                'action_items': []
+            }
+            
+            # Add specific action items based on context and skill category
+            for skill in missing_skills:
+                # Find the category of the skill
+                skill_category = None
+                for category, skills_list in TECHNICAL_SKILLS.items():
+                    if skill.lower() in [s.lower() for s in skills_list]:
+                        skill_category = category
+                        break
+                
+                if skill_category:
+                    if context == 'requirements':
+                        suggestion['action_items'].extend([
+                            f"Highlight any relevant experience with {skill}",
+                            f"Add specific examples of using {skill} in your work history",
+                            f"Consider taking courses or certifications in {skill}"
+                        ])
+                    elif context == 'experience':
+                        suggestion['action_items'].extend([
+                            f"Add projects or work experience involving {skill}",
+                            f"Quantify your achievements with {skill}",
+                            f"Link your existing experience to {skill}"
+                        ])
+                    else:
+                        suggestion['action_items'].extend([
+                            f"Add examples of {skill} in your responsibilities",
+                            f"Highlight how you've handled {skill} in past roles",
+                            f"Demonstrate your ability to work with {skill}"
+                        ])
+            
+            suggestions.append(suggestion)
     
-    # Analyze experience requirements
-    experience_patterns = [
-        r'(\d+)\+\s*(?:years?|yrs?)\s*(?:of)?\s*experience',
-        r'experience\s*(?:of)?\s*(\d+)\+\s*(?:years?|yrs?)',
-        r'(\d+)\s*(?:years?|yrs?)\s*(?:of)?\s*experience'
-    ]
-    
-    for pattern in experience_patterns:
-        matches = re.finditer(pattern, job_description.lower())
-        for match in matches:
-            years = match.group(1)
-            suggestions.append({
-                'category': 'Experience Requirements',
-                'suggestion': f"The job requires {years}+ years of experience. Make sure your resume clearly demonstrates your relevant experience.",
-                'action_items': [
-                    "Quantify your experience with specific years and achievements",
-                    "Highlight relevant projects and their impact",
-                    "Include metrics and results from your past roles",
-                    "Emphasize transferable skills from other experiences"
-                ]
-            })
-    
-    # Analyze education requirements
-    education_keywords = {
-        'bachelor': ['bachelor', 'bs', 'ba', 'b.s.', 'b.a.'],
-        'master': ['master', 'ms', 'ma', 'm.s.', 'm.a.'],
-        'phd': ['phd', 'doctorate', 'ph.d.'],
-        'certification': ['certification', 'certified', 'certificate']
-    }
-    
-    for degree, keywords in education_keywords.items():
-        if any(keyword in job_description.lower() for keyword in keywords):
-            suggestions.append({
-                'category': 'Education Requirements',
-                'suggestion': f"The job requires a {degree} degree. Ensure your education qualifications are prominently displayed.",
-                'action_items': [
-                    f"List your {degree} degree first in the education section",
-                    "Include relevant coursework and projects",
-                    "Highlight academic achievements and honors",
-                    "Mention relevant certifications if applicable"
-                ]
-            })
-    
-    # Analyze soft skills requirements
-    soft_skills = {
-        'communication': ['communication', 'communicate', 'presentation', 'writing', 'speaking'],
-        'leadership': ['leadership', 'lead', 'manage', 'supervise', 'mentor'],
-        'teamwork': ['teamwork', 'collaboration', 'team player', 'cross-functional'],
-        'problem-solving': ['problem-solving', 'analytical', 'critical thinking', 'troubleshooting'],
-        'time management': ['time management', 'deadline', 'prioritization', 'organization']
-    }
-    
-    for skill, keywords in soft_skills.items():
-        if any(keyword in job_description.lower() for keyword in keywords):
-            suggestions.append({
-                'category': 'Soft Skills',
-                'suggestion': f"The job emphasizes {skill} skills. Add specific examples of these skills in your experience.",
-                'action_items': [
-                    f"Add concrete examples of {skill} in your work experience",
-                    "Include metrics or results that demonstrate {skill}",
-                    "Highlight relevant projects where {skill} was crucial",
-                    "Mention any training or certifications related to {skill}"
-                ]
-            })
-    
-    # Analyze industry-specific requirements
-    industry_keywords = ['industry', 'sector', 'domain', 'field', 'market']
-    if any(keyword in job_description.lower() for keyword in industry_keywords):
-        suggestions.append({
-            'category': 'Industry Experience',
-            'suggestion': "The job requires specific industry experience. Highlight your relevant industry background.",
-            'action_items': [
-                "List relevant industry experience prominently",
-                "Highlight industry-specific projects and achievements",
-                "Mention industry certifications and training",
-                "Include industry-specific tools and technologies you've used"
-            ]
-        })
+    # Sort suggestions by confidence
+    suggestions.sort(key=lambda x: x['confidence'], reverse=True)
     
     return suggestions
 

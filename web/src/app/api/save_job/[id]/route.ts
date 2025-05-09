@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
   const { id } = params;
-  const flaskUrl = `http://127.0.0.1:5000/api/save_job/${id}`;
+  const flaskUrl = `http://127.0.0.1:8080/api/save_job/${id}`;
   const flaskRes = await fetch(flaskUrl, {
     method: 'POST',
     headers: { 'Accept': 'application/json' },
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
   const { id } = params;
-  const flaskUrl = `http://127.0.0.1:5000/api/save_job/${id}`;
+  const flaskUrl = `http://127.0.0.1:8080/api/save_job/${id}`;
   const flaskRes = await fetch(flaskUrl, {
     method: 'DELETE',
     headers: { 'Accept': 'application/json' },
