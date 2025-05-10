@@ -108,90 +108,78 @@ def fetch_linkedin_jobs(keyword, location):
             'DNT': '1'
         }
         
-        # Handle remote locations
-        if location.lower() in ['remote', 'work from home', 'anywhere']:
-            search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location=Worldwide&f_WT=2"
-        else:
-            search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location={quote_plus(location)}"
-        
-        print(f"\nFetching LinkedIn jobs from: {search_url}")
-        session = requests.Session()
-        
-        # First make a GET request to the main page
-        try:
-            response = session.get('https://www.linkedin.com', headers=headers, timeout=10)
-            response.raise_for_status()
-            time.sleep(random.uniform(2, 4))  # Wait before the next request
-        except Exception as e:
-            print(f"Warning: Could not access LinkedIn main page: {str(e)}")
-        
-        # Now fetch the search results
-        response = session.get(search_url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        print(f"LinkedIn response status code: {response.status_code}")
-        print(f"LinkedIn response content type: {response.headers.get('content-type', 'unknown')}")
-        print(f"LinkedIn response length: {len(response.text)}")
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
         jobs = []
-        
-        # Try different selectors for job cards
-        job_cards = soup.select('.jobs-search__results-list li') or soup.select('.job-card-container')
-        print(f"Found {len(job_cards)} LinkedIn job cards")
-        
-        for job_card in job_cards:
+        # LinkedIn paginates with the 'start' parameter (0, 25, 50, ...)
+        for start in range(0, 250, 25):  # Fetch 10 pages (0, 25, ..., 225)
+            if location.lower() in ['remote', 'work from home', 'anywhere']:
+                search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location=Worldwide&f_WT=2&start={start}"
+            else:
+                search_url = f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(keyword)}&location={quote_plus(location)}&start={start}"
+            print(f"\nFetching LinkedIn jobs from: {search_url}")
+            session = requests.Session()
             try:
-                # Try different selectors for each element
-                title_elem = (
-                    job_card.select_one('.base-search-card__title') or 
-                    job_card.select_one('.job-card-list__title') or
-                    job_card.select_one('.job-search-card__title')
-                )
-                company_elem = (
-                    job_card.select_one('.base-search-card__subtitle') or 
-                    job_card.select_one('.job-card-container__company-name') or
-                    job_card.select_one('.job-search-card__company-name')
-                )
-                location_elem = (
-                    job_card.select_one('.job-search-card__location') or 
-                    job_card.select_one('.job-card-container__metadata-item') or
-                    job_card.select_one('.job-search-card__location')
-                )
-                link_elem = (
-                    job_card.select_one('a.base-card__full-link') or 
-                    job_card.select_one('a.job-card-container__link') or
-                    job_card.select_one('a.job-search-card__link')
-                )
-                
-                if not all([title_elem, company_elem, location_elem, link_elem]):
-                    continue
-                
-                job_location = location_elem.text.strip()
-                job = {
-                    'title': title_elem.text.strip(),
-                    'company': company_elem.text.strip(),
-                    'company_info': '',
-                    'location': job_location,
-                    'url': link_elem['href'],
-                    'date_posted': datetime.now().strftime('%Y-%m-%d'),
-                    'platform': 'LinkedIn',
-                    'description': 'Click "Details" to view full description',
-                    'requirements': [],
-                    'match_score': 'N/A',
-                    'salary_min': '',
-                    'salary_max': '',
-                    'salary_currency': '',
-                    'benefits': []
-                }
-                
-                jobs.append(job)
-                print(f"Added LinkedIn job: {job['title']} at {job['company']}")
+                response = session.get('https://www.linkedin.com', headers=headers, timeout=10)
+                response.raise_for_status()
+                time.sleep(random.uniform(2, 4))
             except Exception as e:
-                print(f"Error parsing LinkedIn job card: {str(e)}")
-                continue
-        
-        print(f"Found {len(jobs)} LinkedIn jobs")
+                print(f"Warning: Could not access LinkedIn main page: {str(e)}")
+            response = session.get(search_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            print(f"LinkedIn response status code: {response.status_code}")
+            print(f"LinkedIn response content type: {response.headers.get('content-type', 'unknown')}")
+            print(f"LinkedIn response length: {len(response.text)}")
+            soup = BeautifulSoup(response.text, 'html.parser')
+            job_cards = soup.select('.jobs-search__results-list li') or soup.select('.job-card-container')
+            print(f"Found {len(job_cards)} LinkedIn job cards on page starting at {start}")
+            for job_card in job_cards:
+                try:
+                    title_elem = (
+                        job_card.select_one('.base-search-card__title') or 
+                        job_card.select_one('.job-card-list__title') or
+                        job_card.select_one('.job-search-card__title')
+                    )
+                    company_elem = (
+                        job_card.select_one('.base-search-card__subtitle') or 
+                        job_card.select_one('.job-card-container__company-name') or
+                        job_card.select_one('.job-search-card__company-name')
+                    )
+                    location_elem = (
+                        job_card.select_one('.job-search-card__location') or 
+                        job_card.select_one('.job-card-container__metadata-item') or
+                        job_card.select_one('.job-search-card__location')
+                    )
+                    link_elem = (
+                        job_card.select_one('a.base-card__full-link') or 
+                        job_card.select_one('a.job-card-container__link') or
+                        job_card.select_one('a.job-search-card__link')
+                    )
+                    if not all([title_elem, company_elem, location_elem, link_elem]):
+                        continue
+                    job_location = location_elem.text.strip()
+                    job = {
+                        'title': title_elem.text.strip(),
+                        'company': company_elem.text.strip(),
+                        'company_info': '',
+                        'location': job_location,
+                        'url': link_elem['href'],
+                        'date_posted': datetime.now().strftime('%Y-%m-%d'),
+                        'platform': 'LinkedIn',
+                        'description': 'Click "Details" to view full description',
+                        'requirements': [],
+                        'match_score': 'N/A',
+                        'salary_min': '',
+                        'salary_max': '',
+                        'salary_currency': '',
+                        'benefits': []
+                    }
+                    jobs.append(job)
+                    print(f"Added LinkedIn job: {job['title']} at {job['company']}")
+                except Exception as e:
+                    print(f"Error parsing LinkedIn job card: {str(e)}")
+                    continue
+            # Add a short delay between page fetches to avoid being blocked
+            time.sleep(random.uniform(2, 4))
+        print(f"Found {len(jobs)} total LinkedIn jobs across all pages")
         return jobs
     except Exception as e:
         print(f"Error fetching LinkedIn jobs: {str(e)}")
@@ -645,8 +633,10 @@ def search():
     location = request.args.get('location', '')
     platform = request.args.get('platform', '')
     page = int(request.args.get('page', 1))
+    sort_by = request.args.get('sort_by', 'date_posted')  # New parameter for sorting
+    sort_order = request.args.get('sort_order', 'desc')   # New parameter for sort order
     
-    print(f"Search parameters - Keyword: {keyword}, Location: {location}, Platform: {platform}")
+    print(f"Search parameters - Keyword: {keyword}, Location: {location}, Platform: {platform}, Sort: {sort_by} {sort_order}")
     
     try:
         # Clear old jobs and fetch new ones
@@ -679,8 +669,30 @@ def search():
         if jobs:
             save_listings(jobs)
         
-        # Get all jobs from database
-        jobs = conn.execute('SELECT * FROM jobs ORDER BY fetched_at DESC').fetchall()
+        # Get all jobs from database with sorting
+        sort_column = {
+            'date_posted': 'date_posted',
+            'title': 'title',
+            'company': 'company',
+            'location': 'location',
+            'match_score': 'match_score'
+        }.get(sort_by, 'date_posted')
+        sort_direction = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
+        # Handle special case for match_score which might be 'N/A'
+        if sort_by == 'match_score':
+            query = f'''
+                SELECT * FROM jobs 
+                ORDER BY 
+                    CASE 
+                        WHEN match_score = 'N/A' THEN 1 
+                        ELSE 0 
+                    END,
+                    CAST(REPLACE(match_score, '%', '') AS FLOAT) {sort_direction}
+            '''
+        else:
+            query = f'SELECT * FROM jobs ORDER BY {sort_column} {sort_direction}'
+            
+        jobs = conn.execute(query).fetchall()
         conn.close()
         
         # Filter jobs based on search criteria with more flexible matching
@@ -693,20 +705,25 @@ def search():
                 keyword.lower() in job['company'].lower() or
                 keyword.lower() in job['description'].lower()
             )
-            
             # More flexible location matching
-            location_match = (
-                not location or
-                location.lower() in job['location'].lower() or
-                f"{location.lower()}," in job['location'].lower() or
-                f", {location.lower()}" in job['location'].lower()
-            )
-            
+            if ',' in location:
+                location_list = [loc.strip().lower() for loc in location.split(',') if loc.strip()]
+            else:
+                location_list = [location.lower()] if location else []
+            location_match = any(loc in job['location'].lower() for loc in location_list)
             # Platform matching
             platform_match = not platform or platform == job['platform']
-            
             if keyword_match and location_match and platform_match:
                 filtered_jobs.append(dict(job))
+        # Deduplicate jobs by title, company, and location
+        seen = set()
+        unique_jobs = []
+        for job in filtered_jobs:
+            key = (job['title'].lower(), job['company'].lower(), job['location'].lower())
+            if key not in seen:
+                seen.add(key)
+                unique_jobs.append(job)
+        filtered_jobs = unique_jobs
         
         # Pagination
         total_jobs = len(filtered_jobs)
@@ -726,7 +743,9 @@ def search():
             'pages': total_pages,
             'current_page': page,
             'locations': locations,
-            'platforms': platforms
+            'platforms': platforms,
+            'sort_by': sort_by,
+            'sort_order': sort_order
         }
         
         return jsonify(response_data)
@@ -740,7 +759,9 @@ def search():
             'pages': 0,
             'current_page': page,
             'locations': [],
-            'platforms': []
+            'platforms': [],
+            'sort_by': sort_by,
+            'sort_order': sort_order
         }), 500
 
 @app.route('/api/tracker', methods=['GET'])

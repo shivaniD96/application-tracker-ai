@@ -22,6 +22,7 @@ interface Job {
   application_status?: string;
   requirements?: string[];
   suggestions?: Suggestion[];
+  date_posted: string;
 }
 
 const COMMON_LOCATIONS = [
@@ -65,11 +66,30 @@ export default function SearchPage() {
   const [modalJob, setModalJob] = useState<Job | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [sortBy, setSortBy] = useState('date_posted');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [searchParams, setSearchParams] = useState({
+    keyword: '',
+    location: '',
+    platform: ''
+  });
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async (e?: React.FormEvent, pageOverride?: number) => {
     if (e) e.preventDefault();
     setLoading(true);
-    const params = new URLSearchParams({ keyword, location, platform, page: String(pageOverride || page) });
+    const params = new URLSearchParams({
+      keyword,
+      location,
+      platform,
+      page: String(pageOverride || page),
+      sort_by: sortBy,
+      sort_order: sortOrder
+    });
     const res = await fetch(`/api/jobs?${params.toString()}`);
     const data = await res.json();
     setJobs(data.jobs || []);
@@ -113,6 +133,47 @@ export default function SearchPage() {
     setActionLoading(a => ({ ...a, [jobId]: '' }));
   };
 
+  const handleSort = (newSortBy: string) => {
+    if (newSortBy === sortBy) {
+      // Toggle sort order if clicking the same sort option
+      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+    } else {
+      // Set new sort by and default to descending order
+      setSortBy(newSortBy);
+      setSortOrder('desc');
+    }
+    // Trigger a new search with the updated sorting
+    handleSearch();
+  };
+
+  const fetchJobs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        keyword: searchParams.keyword,
+        location: searchParams.location,
+        platform: searchParams.platform,
+        page: page.toString(),
+        sort_by: sortBy,
+        sort_order: sortOrder
+      });
+      
+      const response = await fetch(`/api/search?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch jobs');
+      
+      const data = await response.json();
+      setJobs(data.jobs);
+      setTotalPages(data.pages);
+      setLocations(data.locations);
+      setPlatforms(data.platforms);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container-fluid py-4">
       <div className="row mb-4">
@@ -146,7 +207,7 @@ export default function SearchPage() {
                       onChange={e => setLocation(e.target.value)}
                       className="form-select form-select-lg"
                     >
-                      <option value="">Select Location</option>
+                      <option value="">All Locations</option>
                       {COMMON_LOCATIONS.map((loc) => (
                         <option key={loc} value={loc}>
                           {loc}
@@ -199,6 +260,37 @@ export default function SearchPage() {
               </form>
             </div>
           </div>
+          
+          {/* Sorting Controls */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <span className="text-muted" style={{ whiteSpace: 'nowrap', fontWeight: 500 }}>Sort by:</span>
+                <select
+                  className="form-select"
+                  style={{ minWidth: 240, maxWidth: 320 }}
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [newSortBy, newSortOrder] = e.target.value.split('-');
+                    setSortBy(newSortBy);
+                    setSortOrder(newSortOrder);
+                    handleSearch();
+                  }}
+                >
+                  <option value="date_posted-desc">Date Posted (Newest First)</option>
+                  <option value="date_posted-asc">Date Posted (Oldest First)</option>
+                  <option value="title-asc">Job Title (A-Z)</option>
+                  <option value="title-desc">Job Title (Z-A)</option>
+                  <option value="company-asc">Company (A-Z)</option>
+                  <option value="company-desc">Company (Z-A)</option>
+                  <option value="location-asc">Location (A-Z)</option>
+                  <option value="location-desc">Location (Z-A)</option>
+                  <option value="match_score-desc">Match Score (Highest First)</option>
+                  <option value="match_score-asc">Match Score (Lowest First)</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div className="row">
@@ -239,7 +331,8 @@ export default function SearchPage() {
                   <h6 className="card-subtitle mb-2 text-muted">{job.company}</h6>
                   <div className="d-flex align-items-center text-muted mb-2">
                     <small className="me-3"><i className="bi bi-geo-alt"></i> {job.location}</small>
-                    <small><i className="bi bi-globe"></i> {job.platform}</small>
+                    <small className="me-3"><i className="bi bi-globe"></i> {job.platform}</small>
+                    <small><i className="bi bi-calendar"></i> {new Date(job.date_posted).toLocaleDateString()}</small>
                   </div>
                   {actionMsg[job.id] && <div className="alert alert-info mt-2 py-1 px-2">{actionMsg[job.id]}</div>}
                 </div>

@@ -20,48 +20,39 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = MAX_R
   }
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
   const keyword = searchParams.get('keyword') || '';
   const location = searchParams.get('location') || '';
   const platform = searchParams.get('platform') || '';
   const page = searchParams.get('page') || '1';
+  const sortBy = searchParams.get('sort_by') || 'date_posted';
+  const sortOrder = searchParams.get('sort_order') || 'desc';
 
-  // Proxy to Flask backend
-  const flaskUrl = `http://127.0.0.1:8080/api/search?keyword=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&platform=${encodeURIComponent(platform)}&page=${encodeURIComponent(page)}`;
-  
   try {
-    const flaskRes = await fetchWithRetry(flaskUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/search?` +
+      new URLSearchParams({
+        keyword,
+        location,
+        platform,
+        page,
+        sort_by: sortBy,
+        sort_order: sortOrder
+      })
+    );
 
-    let data = {};
-    try {
-      data = await flaskRes.json();
-    } catch (e) {
-      console.error('JSON parse error:', e);
-      data = { 
-        jobs: [], 
-        total: 0, 
-        pages: 1, 
-        current_page: 1,
-        error: 'Invalid JSON response from backend'
-      };
+    if (!response.ok) {
+      throw new Error('Failed to fetch jobs');
     }
 
+    const data = await response.json();
     return NextResponse.json(data);
-  } catch (e) {
-    console.error('Fetch error:', e);
-    return NextResponse.json({ 
-      jobs: [], 
-      total: 0, 
-      pages: 1, 
-      current_page: 1,
-      error: 'Failed to connect to backend. Please try again in a few moments.'
-    });
+  } catch (error) {
+    console.error('Error fetching jobs:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch jobs' },
+      { status: 500 }
+    );
   }
 }

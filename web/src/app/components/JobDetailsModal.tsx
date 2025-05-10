@@ -37,6 +37,7 @@ interface Job {
   match_percentage?: number;
   matched_skills?: { [key: string]: MatchedSkill };
   missing_skills?: { [key: string]: MatchedSkill };
+  date_posted: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
@@ -55,8 +56,11 @@ export default function JobDetailsModal({ open, onClose, job }: JobDetailsModalP
           <DialogTitle>{job.title}</DialogTitle>
           <DialogContent dividers>
             <Typography variant="subtitle1" color="text.secondary" gutterBottom>{job.company}</Typography>
-            <Typography variant="body2" gutterBottom><strong>Location:</strong> {job.location}</Typography>
-            <Typography variant="body2" gutterBottom><strong>Platform:</strong> {job.platform}</Typography>
+            <div className="d-flex align-items-center text-muted mb-3">
+              <small className="me-3"><i className="bi bi-geo-alt"></i> {job.location}</small>
+              <small className="me-3"><i className="bi bi-globe"></i> {job.platform}</small>
+              <small><i className="bi bi-calendar"></i> {new Date(job.date_posted).toLocaleDateString()}</small>
+            </div>
             
             {job.match_percentage !== undefined && (
               <>
