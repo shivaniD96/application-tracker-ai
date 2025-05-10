@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import JobDetailsModal from '../components/JobDetailsModal';
 import Pagination from '@mui/material/Pagination';
 import Stack from '@mui/material/Stack';
@@ -54,6 +54,8 @@ const COMMON_LOCATIONS = [
   'Remote', 'Work from Home', 'Anywhere'
 ];
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
 export default function SearchPage() {
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('');
@@ -78,6 +80,60 @@ export default function SearchPage() {
     platform: ''
   });
   const [error, setError] = useState<string | null>(null);
+  const [jobStatuses, setJobStatuses] = useState<{[id: number]: string}>({});
+
+  // Restore search state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('jobSearchState');
+    if (saved) {
+      const { keyword, location, platform, jobs, page, sortBy, sortOrder } = JSON.parse(saved);
+      setKeyword(keyword);
+      setLocation(location);
+      setPlatform(platform);
+      setJobs(jobs);
+      setPage(page);
+      setSortBy(sortBy);
+      setSortOrder(sortOrder);
+    }
+  }, []);
+
+  // Fetch applied jobs and merge statuses into job list
+  useEffect(() => {
+    async function fetchAppliedStatuses() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/tracker`);
+        const data = await res.json();
+        const appliedStatuses: {[id: number]: string} = {};
+        (data.applications || []).forEach((app: any) => {
+          appliedStatuses[app.job_id] = app.status;
+        });
+        setJobStatuses(s => ({ ...s, ...appliedStatuses }));
+      } catch {}
+    }
+    if (jobs.length > 0) fetchAppliedStatuses();
+  }, [jobs]);
+
+  // Save search state to localStorage whenever jobs or params change
+  useEffect(() => {
+    localStorage.setItem('jobSearchState', JSON.stringify({
+      keyword, location, platform, jobs, page, sortBy, sortOrder
+    }));
+  }, [keyword, location, platform, jobs, page, sortBy, sortOrder]);
+
+  // Add effect to sync job status updates from localStorage
+  useEffect(() => {
+    function syncJobStatusUpdates() {
+      const updates = JSON.parse(localStorage.getItem('jobStatusUpdates') || '{}');
+      if (Object.keys(updates).length > 0) {
+        setJobStatuses(s => ({ ...s, ...updates }));
+        setJobs(jobs => jobs.map(j => updates[j.id] ? { ...j, application_status: updates[j.id] } : j));
+        localStorage.removeItem('jobStatusUpdates');
+      }
+    }
+    syncJobStatusUpdates();
+    window.addEventListener('focus', syncJobStatusUpdates);
+    return () => window.removeEventListener('focus', syncJobStatusUpdates);
+  }, []);
 
   const handleSearch = async (e?: React.FormEvent, pageOverride?: number) => {
     if (e) e.preventDefault();
@@ -90,11 +146,21 @@ export default function SearchPage() {
       sort_by: sortBy,
       sort_order: sortOrder
     });
-    const res = await fetch(`/api/jobs?${params.toString()}`);
+    const res = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`);
     const data = await res.json();
     setJobs(data.jobs || []);
     setTotalPages(data.pages || 1);
     setLoading(false);
+    // After search, fetch applied statuses
+    try {
+      const res2 = await fetch(`${API_BASE_URL}/api/tracker`);
+      const tracker = await res2.json();
+      const appliedStatuses: {[id: number]: string} = {};
+      (tracker.applications || []).forEach((app: any) => {
+        appliedStatuses[app.job_id] = app.status;
+      });
+      setJobStatuses(s => ({ ...s, ...appliedStatuses }));
+    } catch {}
   };
 
   const handlePageChange = (_: unknown, value: number) => {
@@ -111,7 +177,7 @@ export default function SearchPage() {
     setModalOpen(true);
     setModalJob(null);
     setActionLoading(a => ({ ...a, [jobId]: 'details' }));
-    const res = await fetch(`/api/job_details/${jobId}`);
+    const res = await fetch(`${API_BASE_URL}/api/job_details/${jobId}`);
     const data = await res.json();
     setModalJob(data);
     setActionLoading(a => ({ ...a, [jobId]: '' }));
@@ -119,17 +185,9 @@ export default function SearchPage() {
 
   const handleSave = async (jobId: number) => {
     setActionLoading(a => ({ ...a, [jobId]: 'save' }));
-    const res = await fetch(`/api/save_job/${jobId}`, { method: 'POST' });
+    const res = await fetch(`${API_BASE_URL}/api/save_job/${jobId}`, { method: 'POST' });
     const data = await res.json();
     setActionMsg(m => ({ ...m, [jobId]: data.status === 'success' ? 'Saved!' : data.status === 'already_saved' ? 'Already saved.' : 'Error saving.' }));
-    setActionLoading(a => ({ ...a, [jobId]: '' }));
-  };
-
-  const handleApply = async (jobId: number) => {
-    setActionLoading(a => ({ ...a, [jobId]: 'apply' }));
-    const res = await fetch(`/api/apply_job/${jobId}`, { method: 'POST' });
-    const data = await res.json();
-    setActionMsg(m => ({ ...m, [jobId]: data.status === 'success' ? 'Applied!' : data.status === 'already_applied' ? 'Already applied.' : 'Error applying.' }));
     setActionLoading(a => ({ ...a, [jobId]: '' }));
   };
 
@@ -159,7 +217,7 @@ export default function SearchPage() {
         sort_order: sortOrder
       });
       
-      const response = await fetch(`/api/search?${params}`);
+      const response = await fetch(`${API_BASE_URL}/api/search?${params}`);
       if (!response.ok) throw new Error('Failed to fetch jobs');
       
       const data = await response.json();
@@ -317,15 +375,39 @@ export default function SearchPage() {
                       <button className="btn btn-sm btn-outline-success" disabled={actionLoading[job.id] === 'save'} onClick={() => handleSave(job.id)}>
                         Save
                       </button>
-                      {job.application_status === 'Applied' ? (
-                        <button className="btn btn-sm btn-outline-danger" disabled>
-                          Didn&apos;t Apply
-                        </button>
-                      ) : (
-                        <button className="btn btn-sm btn-outline-primary" disabled={actionLoading[job.id] === 'apply'} onClick={() => handleApply(job.id)}>
-                          Apply
-                        </button>
-                      )}
+                      {/* Status Dropdown */}
+                      <select
+                        className="form-select form-select-sm"
+                        style={{ width: 110 }}
+                        value={jobStatuses[job.id] || job.application_status || 'Open'}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          setJobStatuses(s => ({ ...s, [job.id]: newStatus }));
+                          setActionLoading(a => ({ ...a, [job.id]: 'apply' }));
+                          if (newStatus === 'Applied') {
+                            await fetch(`${API_BASE_URL}/api/apply_job/${job.id}`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'Applied' })
+                            });
+                            setActionMsg(m => ({ ...m, [job.id]: 'Applied!' }));
+                            setJobs(jobs => jobs.map(j => j.id === job.id ? { ...j, application_status: 'Applied' } : j));
+                            window.open(job.url, '_blank');
+                          } else {
+                            await fetch(`${API_BASE_URL}/api/update_application_status/${job.id}`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'Open' })
+                            });
+                            setActionMsg(m => ({ ...m, [job.id]: 'Set to Open.' }));
+                            setJobs(jobs => jobs.map(j => j.id === job.id ? { ...j, application_status: 'Open' } : j));
+                          }
+                          setActionLoading(a => ({ ...a, [job.id]: '' }));
+                        }}
+                      >
+                        <option value="Open">Open</option>
+                        <option value="Applied">Applied</option>
+                      </select>
                     </div>
                   </div>
                   <h6 className="card-subtitle mb-2 text-muted">{job.company}</h6>

@@ -27,11 +27,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 import PyPDF2
 import docx
 from flask_cors import CORS
+import traceback
+import pandas as pd
 
 # CONFIGURATION
 DB_PATH = 'jobs.db'
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
+ALLOWED_EXCEL_EXTENSIONS = {'xlsx', 'xls', 'csv'}
 PER_PAGE = 5
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -551,36 +554,56 @@ def get_conn():
     return conn
 
 def init_db():
-    c = get_conn().cursor()
-    c.execute("""
-CREATE TABLE IF NOT EXISTS jobs (
-    id INTEGER PRIMARY KEY,
-    title TEXT, company TEXT, company_info TEXT, location TEXT, url TEXT UNIQUE,
-    date_posted TEXT, platform TEXT, requirements TEXT, description TEXT,
-    match_score TEXT, fetched_at TIMESTAMP
-)
-""")
-    c.execute("""
-CREATE TABLE IF NOT EXISTS applications (
-    id INTEGER PRIMARY KEY, job_id INTEGER,
-    status TEXT, applied_at DATE,
-    FOREIGN KEY(job_id) REFERENCES jobs(id)
-)
-""")
-    c.execute("""
-CREATE TABLE IF NOT EXISTS resume (
-    id INTEGER PRIMARY KEY, filename TEXT, uploaded_at TIMESTAMP
-)
-""")
-    c.execute("""
-CREATE TABLE IF NOT EXISTS saved_jobs (
-    id INTEGER PRIMARY KEY,
-    job_id INTEGER,
-    saved_at TIMESTAMP,
-    FOREIGN KEY(job_id) REFERENCES jobs(id)
-)
-""")
-    get_conn().commit()
+    conn = get_conn()
+    c = conn.cursor()
+    
+    # Create jobs table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS jobs (
+            id INTEGER PRIMARY KEY,
+            title TEXT,
+            company TEXT,
+            company_info TEXT,
+            location TEXT,
+            url TEXT UNIQUE,
+            date_posted TEXT,
+            platform TEXT,
+            requirements TEXT,
+            description TEXT,
+            match_score TEXT,
+            fetched_at TIMESTAMP
+        )
+    ''')
+    
+    # Create applications table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS applications (
+            id INTEGER PRIMARY KEY,
+            job_id INTEGER,
+            status TEXT,
+            applied_at DATE,
+            company TEXT,
+            location TEXT,
+            referral TEXT,
+            job_link TEXT UNIQUE,
+            referral_mail TEXT,
+            title TEXT,
+            FOREIGN KEY (job_id) REFERENCES jobs (id)
+        )
+    ''')
+    
+    # Create saved_jobs table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS saved_jobs (
+            id INTEGER PRIMARY KEY,
+            job_id INTEGER,
+            saved_at TIMESTAMP,
+            FOREIGN KEY (job_id) REFERENCES jobs (id)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -588,6 +611,9 @@ init_db()
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_excel_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXCEL_EXTENSIONS
 
 # SAVE LISTINGS
 def save_listings(listings):
@@ -665,6 +691,7 @@ def search():
             except Exception as e:
                 print(f"Error fetching ZipRecruiter jobs: {str(e)}")
         
+        print(f"DEBUG: Jobs fetched: {len(jobs)}")
         # Save the jobs to database
         if jobs:
             save_listings(jobs)
@@ -677,7 +704,9 @@ def search():
             'location': 'location',
             'match_score': 'match_score'
         }.get(sort_by, 'date_posted')
+        
         sort_direction = 'DESC' if sort_order.lower() == 'desc' else 'ASC'
+        
         # Handle special case for match_score which might be 'N/A'
         if sort_by == 'match_score':
             query = f'''
@@ -693,6 +722,7 @@ def search():
             query = f'SELECT * FROM jobs ORDER BY {sort_column} {sort_direction}'
             
         jobs = conn.execute(query).fetchall()
+        print(f"DEBUG: Jobs in DB after save: {len(jobs)}")
         conn.close()
         
         # Filter jobs based on search criteria with more flexible matching
@@ -715,6 +745,7 @@ def search():
             platform_match = not platform or platform == job['platform']
             if keyword_match and location_match and platform_match:
                 filtered_jobs.append(dict(job))
+        print(f"DEBUG: Filtered jobs: {len(filtered_jobs)}")
         # Deduplicate jobs by title, company, and location
         seen = set()
         unique_jobs = []
@@ -724,7 +755,7 @@ def search():
                 seen.add(key)
                 unique_jobs.append(job)
         filtered_jobs = unique_jobs
-        
+        print(f"DEBUG: Unique jobs after deduplication: {len(filtered_jobs)}")
         # Pagination
         total_jobs = len(filtered_jobs)
         jobs_per_page = 5
@@ -732,11 +763,10 @@ def search():
         start_idx = (page - 1) * jobs_per_page
         end_idx = start_idx + jobs_per_page
         paginated_jobs = filtered_jobs[start_idx:end_idx]
-        
+        print(f"DEBUG: Paginated jobs: {len(paginated_jobs)}")
         # Get unique locations and platforms for filters
         locations = sorted(list(set(job['location'] for job in jobs)))
         platforms = sorted(list(set(job['platform'] for job in jobs)))
-        
         response_data = {
             'jobs': paginated_jobs,
             'total': total_jobs,
@@ -747,11 +777,11 @@ def search():
             'sort_by': sort_by,
             'sort_order': sort_order
         }
-        
         return jsonify(response_data)
         
     except Exception as e:
         print(f"Error in search function: {str(e)}")
+        import traceback; traceback.print_exc()
         return jsonify({
             'error': str(e),
             'jobs': [],
@@ -764,13 +794,76 @@ def search():
             'sort_order': sort_order
         }), 500
 
+@app.route('/api/db-status', methods=['GET'])
+def db_status():
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        
+        # Check applications table
+        cursor.execute("SELECT COUNT(*) FROM applications")
+        app_count = cursor.fetchone()[0]
+        
+        # Check jobs table
+        cursor.execute("SELECT COUNT(*) FROM jobs")
+        jobs_count = cursor.fetchone()[0]
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(applications)")
+        app_columns = cursor.fetchall()
+        
+        cursor.execute("PRAGMA table_info(jobs)")
+        jobs_columns = cursor.fetchall()
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'applications_count': app_count,
+            'jobs_count': jobs_count,
+            'applications_columns': [dict(col) for col in app_columns],
+            'jobs_columns': [dict(col) for col in jobs_columns]
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @app.route('/api/tracker', methods=['GET'])
 def tracker():
-    conn = get_conn()
-    apps = conn.execute('SELECT a.id,a.job_id,a.status,a.applied_at,j.title FROM applications a JOIN jobs j ON a.job_id=j.id').fetchall()
-    conn.close()
-    apps = [dict(a) for a in apps]
-    return jsonify({'applications': apps})
+    try:
+        conn = get_conn()
+        print('DEBUG: Checking database connection...')
+        print('DEBUG: Database path:', DB_PATH)
+        # First check if we have any applications
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM applications')
+        count = cursor.fetchone()[0]
+        print(f'DEBUG: Total applications in database: {count}')
+        # Get all applications with their details
+        apps = conn.execute('''
+            SELECT a.*, j.title as job_title 
+            FROM applications a 
+            LEFT JOIN jobs j ON a.job_id = j.id 
+            WHERE a.status = "Applied"
+        ''').fetchall()
+        print(f'DEBUG: Found {len(apps)} applied applications')
+        for app in apps:
+            print(f'DEBUG: Application: {dict(app)}')
+        def safe_dict(row):
+            d = dict(row)
+            for k, v in d.items():
+                if v is None:
+                    d[k] = ''
+            return d
+        conn.close()
+        return jsonify({'applications': [safe_dict(app) for app in apps]})
+    except Exception as e:
+        import traceback
+        print(f"Error in /api/tracker: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'applications': [], 'error': str(e)}), 500
 
 @app.route('/api/saved_jobs', methods=['GET'])
 def saved_jobs():
@@ -934,36 +1027,68 @@ def job_details(job_id):
             conn.close()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/update_application_status/<int:job_id>', methods=['POST'])
-def update_application_status(job_id):
+@app.route('/api/apply_job/<int:job_id>', methods=['POST'])
+def apply_job(job_id):
+    conn = get_conn()
+    try:
+        data = request.get_json(silent=True) or {}
+        status = data.get('status', 'Applied')
+        # Fetch job details from jobs table
+        job = conn.execute('SELECT * FROM jobs WHERE id = ?', (job_id,)).fetchone()
+        if not job:
+            return jsonify({'status': 'error', 'message': 'Job not found'}), 404
+        # Extract job details
+        company = job['company']
+        location = job['location']
+        job_link = job['url']
+        title = job['title']
+        # Check if application already exists
+        app_row = conn.execute('SELECT id FROM applications WHERE job_id = ?', (job_id,)).fetchone()
+        if app_row:
+            # Update status and details if needed
+            conn.execute('UPDATE applications SET status = ?, company = ?, location = ?, job_link = ?, title = ? WHERE job_id = ?', (status, company, location, job_link, title, job_id))
+        else:
+            conn.execute('INSERT INTO applications (job_id, status, company, location, job_link, title, applied_at) VALUES (?, ?, ?, ?, ?, ?, ?)', (job_id, status, company, location, job_link, title, datetime.now()))
+        conn.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        print(f"Error in apply_job: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/update_application_status/<int:app_id>', methods=['POST'])
+def update_application_status(app_id):
     conn = None
     try:
         data = request.get_json()
         new_status = data.get('status')
+        referral = data.get('referral')
+        referral_mail = data.get('referral_mail')
         
         if not new_status:
             return jsonify({'status': 'error', 'message': 'Status is required'}), 400
-        
+            
         conn = get_conn()
         
-        # Check if job exists
-        job = conn.execute('SELECT id FROM jobs WHERE id = ?', (job_id,)).fetchone()
-        if not job:
-            return jsonify({'status': 'error', 'message': 'Job not found'}), 404
-            
         # Check if application exists
-        application = conn.execute('SELECT id FROM applications WHERE job_id = ?', (job_id,)).fetchone()
+        application = conn.execute('SELECT id FROM applications WHERE id = ?', (app_id,)).fetchone()
         if not application:
-            return jsonify({'status': 'error', 'message': 'No application found for this job'}), 404
+            return jsonify({'status': 'error', 'message': 'Application not found'}), 404
             
-        if new_status == 'Not Applied':
+        if new_status == 'Open':
             # Remove the application record
-            conn.execute('DELETE FROM applications WHERE job_id = ?', (job_id,))
+            conn.execute('DELETE FROM applications WHERE id = ?', (app_id,))
         else:
-            # Update the application status for other statuses
-            conn.execute('UPDATE applications SET status = ? WHERE job_id = ?',
-                        (new_status, job_id))
-        
+            # Update the application status and other fields
+            conn.execute('''
+                UPDATE applications 
+                SET status = ?, 
+                    referral = ?,
+                    referral_mail = ?
+                WHERE id = ?
+            ''', (new_status, referral, referral_mail, app_id))
+            
         conn.commit()
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -1342,6 +1467,122 @@ def generate_personalized_suggestions(job_requirements, resume_skills, resume_te
     suggestions.sort(key=lambda x: x['confidence'], reverse=True)
     
     return suggestions
+
+def migrate_applications_table():
+    conn = get_conn()
+    c = conn.cursor()
+    # Add columns if they do not exist
+    try:
+        c.execute("ALTER TABLE applications ADD COLUMN company TEXT")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE applications ADD COLUMN location TEXT")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE applications ADD COLUMN referral TEXT")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE applications ADD COLUMN job_link TEXT")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE applications ADD COLUMN referral_mail TEXT")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE applications ADD COLUMN title TEXT")
+    except Exception:
+        pass
+    conn.commit()
+    conn.close()
+
+@app.route('/api/migrate-applications', methods=['POST'])
+def migrate_applications():
+    migrate_applications_table()
+    return jsonify({'status': 'success', 'message': 'Applications table migrated.'})
+
+@app.route('/api/upload_applications_excel', methods=['POST'])
+def upload_applications_excel():
+    clear_applications_if_large()
+    if 'file' not in request.files:
+        return jsonify({'status': 'error', 'message': 'No file uploaded'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'status': 'error', 'message': 'No file selected'}), 400
+    if not allowed_excel_file(file.filename):
+        return jsonify({'status': 'error', 'message': 'Invalid file type'}), 400
+    try:
+        # Save file temporarily
+        filename = secure_filename(file.filename)
+        temp_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(temp_path)
+        # Read with pandas
+        if filename.endswith('.csv'):
+            df = pd.read_csv(temp_path)
+        else:
+            df = pd.read_excel(temp_path)
+        # Clean up temp file
+        os.remove(temp_path)
+        # Map columns
+        col_map = {
+            'Company': 'company',
+            'Location': 'location',
+            'Referral': 'referral',
+            'Link': 'job_link',
+            'Status': 'status',
+            'Referral mail': 'referral_mail',
+        }
+        df = df.rename(columns=col_map)
+        # Upsert each row
+        conn = get_conn()
+        c = conn.cursor()
+        for _, row in df.iterrows():
+            company = str(row.get('company', '')).strip()
+            location = str(row.get('location', '')).strip()
+            referral = str(row.get('referral', '')).strip()
+            job_link = str(row.get('job_link', '')).strip()
+            status = str(row.get('status', '')).strip()
+            referral_mail = str(row.get('referral_mail', '')).strip()
+            if job_link:
+                # First try to update existing record
+                c.execute('''UPDATE applications 
+                           SET company=?, location=?, referral=?, status=?, referral_mail=?
+                           WHERE job_link=?''',
+                        (company, location, referral, status, referral_mail, job_link))
+                # If no record was updated, insert new one
+                if c.rowcount == 0:
+                    c.execute('''INSERT INTO applications 
+                               (company, location, referral, job_link, status, referral_mail)
+                               VALUES (?, ?, ?, ?, ?, ?)''',
+                            (company, location, referral, job_link, status, referral_mail))
+            else:
+                # If no job_link, just insert as new record
+                c.execute('''INSERT INTO applications 
+                           (company, location, referral, status, referral_mail)
+                           VALUES (?, ?, ?, ?, ?)''',
+                        (company, location, referral, status, referral_mail))
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'message': 'Applications uploaded and updated.'})
+    except Exception as e:
+        print(f"Error uploading applications Excel: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# Add this utility function near the top, after get_conn()
+def clear_applications_if_large(threshold=200):
+    conn = get_conn()
+    count = conn.execute('SELECT COUNT(*) FROM applications').fetchone()[0]
+    if count > threshold:
+        print(f"Clearing applications table (had {count} rows)")
+        conn.execute('DELETE FROM applications')
+        conn.commit()
+    conn.close()
+
+# Call this at app startup
+clear_applications_if_large()
 
 if __name__ == '__main__':
     import sys
